@@ -1,0 +1,1 @@
+/usr/bin/g++-14 -g CMakeFiles/caparoc_commander.dir/src/caparoc_commander.cpp.o CMakeFiles/caparoc_commander.dir/src/cli_parser.cpp.o CMakeFiles/caparoc_commander.dir/src/create_modbus_connection.cpp.o -o bin/caparoc_commander  _deps/libcaparoc_proj-build/libcaparoc.a _deps/libmodbus_cpp_proj-build/libmodbus_cpp.a -lmodbus 
