@@ -13,6 +13,7 @@ include(GNUInstallDirs)
 # Dependencies – rebuilt from source
 # ---------------------------------------------------------------------------
 if(NOT TARGET caparoc)
+    set(LIBMODBUS_CPP_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(
         libcaparoc_proj
         GIT_REPOSITORY https://github.com/daixtrose/libcaparoc.git

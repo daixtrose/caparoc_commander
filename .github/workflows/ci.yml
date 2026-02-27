@@ -49,10 +49,11 @@ jobs:
 
       - name: Verify RUNPATH and .deb content
         run: |
-          echo "=== RUNPATH ==="
-          readelf -d build/linux-x86_64-release/bin/caparoc_commander | grep -i -E 'runpath|rpath' || true
           echo "=== .deb contents ==="
           dpkg -c build/linux-x86_64-release/*.deb
+          echo "=== RUNPATH (installed binary) ==="
+          dpkg -x build/linux-x86_64-release/*.deb /tmp/deb-extract
+          readelf -d /tmp/deb-extract/opt/daixtrose/*/bin/* | grep -i -E 'runpath|rpath'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
