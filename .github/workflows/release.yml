@@ -28,7 +28,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config libmodbus-dev
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev
 
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
@@ -44,17 +44,19 @@ jobs:
         run: cmake --build --preset linux-x86_64-release --parallel
 
       - name: Package
-        run: cpack --preset linux-x86_64-release
+        run: |
+          cpack --preset linux-x86_64-release
+          mkdir -p artifacts
+          find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-packages
-          path: build/linux-x86_64-release/*.tar.gz
+          path: artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/linux-x86_64-release/*.tar.gz
-            build/linux-x86_64-release/*.deb
+            artifacts/*

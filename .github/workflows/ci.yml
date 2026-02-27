@@ -29,7 +29,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config libmodbus-dev
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev
 
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
@@ -43,6 +43,16 @@ jobs:
 
       - name: Build
         run: cmake --build --preset linux-x86_64-release --parallel
+
+      - name: Package
+        run: cpack --preset linux-x86_64-release
+
+      - name: Verify RUNPATH and .deb content
+        run: |
+          echo "=== RUNPATH ==="
+          readelf -d build/linux-x86_64-release/bin/caparoc_commander | grep -i -E 'runpath|rpath' || true
+          echo "=== .deb contents ==="
+          dpkg -c build/linux-x86_64-release/*.deb
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
