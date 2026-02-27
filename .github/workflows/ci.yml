@@ -11,7 +11,7 @@ env:
   CMAKE_VERSION: "4.2.3"
 
 jobs:
-  build:
+  build-linux-x86_64:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -62,3 +62,47 @@ jobs:
         with:
           name: caparoc-commander-linux-x86_64
           path: build/linux-x86_64-release/bin/caparoc_commander
+
+  build-linux-aarch64:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git credentials for FetchContent
+        run: |
+          TOKEN="${{ secrets.FETCHCONTENT_GH_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
+
+      - name: Install CMake ${{ env.CMAKE_VERSION }}
+        run: |
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
+          echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Configure
+        run: cmake --preset linux-aarch64-release
+
+      - name: Build
+        run: cmake --build --preset linux-aarch64-release --parallel
+
+      - name: Package
+        run: cpack --preset linux-aarch64-release
+
+      - name: Verify package content
+        run: |
+          echo "=== .deb contents ==="
+          dpkg -c build/linux-aarch64-release/*.deb
+          echo "=== Verify arm64 architecture ==="
+          dpkg-deb --info build/linux-aarch64-release/*.deb | grep Architecture
+          echo "=== RUNPATH (installed binary) ==="
+          dpkg -x build/linux-aarch64-release/*.deb /tmp/deb-extract-aarch64
+          aarch64-linux-gnu-readelf -d /tmp/deb-extract-aarch64/opt/daixtrose/*/bin/* | grep -i -E 'runpath|rpath'

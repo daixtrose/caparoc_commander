@@ -42,6 +42,20 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       }
+    },
+    {
+      "name": "linux-aarch64-release",
+      "displayName": "Linux aarch64 Release (cross-compile for RPi 5 / RevPi Connect 5)",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-linux-aarch64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     }
   ],
   "buildPresets": [
@@ -56,6 +70,12 @@
       "displayName": "Linux x86_64 Debug",
       "configurePreset": "linux-x86_64-debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "linux-aarch64-release",
+      "displayName": "Linux aarch64 Release",
+      "configurePreset": "linux-aarch64-release",
+      "configuration": "Release"
     }
   ],
   "packagePresets": [
@@ -63,6 +83,12 @@
       "name": "linux-x86_64-release",
       "displayName": "Linux x86_64 Packages",
       "configurePreset": "linux-x86_64-release",
+      "generators": ["TGZ", "DEB", "RPM"]
+    },
+    {
+      "name": "linux-aarch64-release",
+      "displayName": "Linux aarch64 Packages",
+      "configurePreset": "linux-aarch64-release",
       "generators": ["TGZ", "DEB", "RPM"]
     }
   ]

@@ -10,10 +10,10 @@ env:
   CMAKE_VERSION: "4.2.3"
 
 jobs:
-  release:
+  build-linux-x86_64:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -52,8 +52,71 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: caparoc-commander-packages
+          name: caparoc-commander-linux-x86_64
           path: artifacts/
+
+  build-linux-aarch64:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git credentials for FetchContent
+        run: |
+          TOKEN="${{ secrets.FETCHCONTENT_GH_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
+
+      - name: Install CMake ${{ env.CMAKE_VERSION }}
+        run: |
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
+          echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Configure
+        run: cmake --preset linux-aarch64-release
+
+      - name: Build
+        run: cmake --build --preset linux-aarch64-release --parallel
+
+      - name: Package
+        run: |
+          cpack --preset linux-aarch64-release
+          mkdir -p artifacts
+          find build/linux-aarch64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caparoc-commander-linux-aarch64
+          path: artifacts/
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux-x86_64, build-linux-aarch64]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Linux x86_64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: caparoc-commander-linux-x86_64
+          path: artifacts
+
+      - name: Download Linux aarch64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: caparoc-commander-linux-aarch64
+          path: artifacts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
