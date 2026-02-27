@@ -39,8 +39,13 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Markus Werle")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_VERBATIM_VARIABLES YES)
 
+# Standard naming with architecture: <pkg>_<ver>_<arch>.deb / <pkg>-<ver>-<rel>.<arch>.rpm
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+set(CPACK_RPM_PACKAGE_RELEASE "1")
+
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(CPACK_GENERATOR TGZ DEB RPM)
+    set(CPACK_GENERATOR TGZ DEB RPM)
     # Debian maintainer scripts: symlink into /usr/local/bin
     set(EXECUTABLE_NAME "caparoc_commander")
     configure_file(
