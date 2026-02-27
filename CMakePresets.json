@@ -1,0 +1,69 @@
+{
+  "version": 8,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "linux-x86_64-release",
+      "displayName": "Linux x86_64 Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-x86_64-debug",
+      "displayName": "Linux x86_64 Debug",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-x86_64-release",
+      "displayName": "Linux x86_64 Release",
+      "configurePreset": "linux-x86_64-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux-x86_64-debug",
+      "displayName": "Linux x86_64 Debug",
+      "configurePreset": "linux-x86_64-debug",
+      "configuration": "Debug"
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "linux-x86_64-release",
+      "displayName": "Linux x86_64 Packages",
+      "configurePreset": "linux-x86_64-release",
+      "generators": ["TGZ", "DEB"]
+    }
+  ]
+}

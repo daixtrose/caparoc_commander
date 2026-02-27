@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 pkg-config libmodbus-dev
+          pip install cmake==4.0.3
+
+      - name: Configure
+        env:
+          CXX: g++-14
+        run: cmake --preset linux-x86_64-release
+
+      - name: Build
+        run: cmake --build --preset linux-x86_64-release --parallel
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caparoc-commander-linux-x86_64
+          path: build/linux-x86_64-release/bin/caparoc_commander

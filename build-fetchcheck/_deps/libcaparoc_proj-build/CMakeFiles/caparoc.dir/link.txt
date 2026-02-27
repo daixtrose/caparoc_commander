@@ -1,2 +1,0 @@
-/usr/bin/ar qc libcaparoc.a CMakeFiles/caparoc.dir/src/caparoc.cpp.o
-/usr/bin/ranlib libcaparoc.a

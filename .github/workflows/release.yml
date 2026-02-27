@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 pkg-config libmodbus-dev
+          pip install cmake==4.0.3
+
+      - name: Configure
+        env:
+          CXX: g++-14
+        run: cmake --preset linux-x86_64-release
+
+      - name: Build
+        run: cmake --build --preset linux-x86_64-release --parallel
+
+      - name: Package
+        run: cpack --preset linux-x86_64-release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caparoc-commander-packages
+          path: build/linux-x86_64-release/*.tar.gz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/linux-x86_64-release/*.tar.gz
+            build/linux-x86_64-release/*.deb

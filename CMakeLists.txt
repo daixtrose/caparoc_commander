@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.25...4.2)
 
 project(caparoc_commander
     VERSION 0.1.0
@@ -6,17 +6,18 @@ project(caparoc_commander
     LANGUAGES CXX
 )
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 include(FetchContent)
+include(GNUInstallDirs)
 
+# ---------------------------------------------------------------------------
+# Dependencies – rebuilt from source
+# ---------------------------------------------------------------------------
 if(NOT TARGET caparoc)
     FetchContent_Declare(
         libcaparoc_proj
         GIT_REPOSITORY https://github.com/daixtrose/libcaparoc.git
-        GIT_TAG v0.1.0
+        GIT_TAG        v0.1.0
+        GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(libcaparoc_proj)
 endif()
@@ -24,13 +25,16 @@ endif()
 if(NOT TARGET CLI11::CLI11)
     FetchContent_Declare(
         cli11_proj
-        QUIET
         GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-        GIT_TAG v2.6.1
+        GIT_TAG        v2.4.2
+        GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(cli11_proj)
 endif()
 
+# ---------------------------------------------------------------------------
+# Executable
+# ---------------------------------------------------------------------------
 add_executable(caparoc_commander
     ${CMAKE_CURRENT_LIST_DIR}/src/caparoc_commander.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/cli_parser.cpp
@@ -65,3 +69,18 @@ elseif(MSVC)
         /W4
     )
 endif()
+
+# ---------------------------------------------------------------------------
+# Install & CPack
+# ---------------------------------------------------------------------------
+install(TARGETS caparoc_commander
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+set(CPACK_PACKAGE_NAME            "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION         "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION     "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_CONTACT         "daixtrose")
+set(CPACK_GENERATOR               "TGZ;DEB")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS  "libmodbus5")
+include(CPack)
