@@ -6,6 +6,7 @@ set(CMAKE_SYSTEM_PROCESSOR aarch64)
 
 set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc-14)
 set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++-14)
+set(CMAKE_STRIP aarch64-linux-gnu-strip)
 
 # Search paths: find libraries/headers for target only, programs on host
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
