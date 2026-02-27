@@ -17,7 +17,7 @@ if(NOT TARGET caparoc)
     FetchContent_Declare(
         libcaparoc_proj
         GIT_REPOSITORY https://github.com/daixtrose/libcaparoc.git
-        GIT_TAG        v0.2.0
+        GIT_TAG        v0.3.0
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(libcaparoc_proj)
