@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  CMAKE_VERSION: "4.2.3"
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -21,7 +24,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y g++-14 pkg-config libmodbus-dev
-          pip install cmake==4.0.3
+
+      - name: Install CMake ${{ env.CMAKE_VERSION }}
+        run: pip install cmake==${{ env.CMAKE_VERSION }}
 
       - name: Configure
         env:
