@@ -20,6 +20,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure git credentials for FetchContent
+        run: |
+          TOKEN="${{ secrets.FETCHCONTENT_GH_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
       - name: Install toolchain
         run: |
           sudo apt-get update
