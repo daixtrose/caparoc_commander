@@ -25,7 +25,9 @@ jobs:
           sudo apt-get install -y g++-14 pkg-config libmodbus-dev
 
       - name: Install CMake ${{ env.CMAKE_VERSION }}
-        run: pip install cmake==${{ env.CMAKE_VERSION }}
+        run: |
+          wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
+          echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Configure
         env:
