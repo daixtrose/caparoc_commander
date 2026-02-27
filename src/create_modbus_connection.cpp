@@ -1,14 +1,14 @@
 #include "caparoc_commander/create_modbus_connection.hpp"
-#include "caparoc/modbus_connection.hpp"
+#include "libmodbus_cpp/modbus_connection.hpp"
 
 #include <format>
 #include <stdexcept>
 
 namespace cli {
 
-caparoc::ModbusConnection create_modbus_connection(const std::string& ip_address, int port, int timeout_seconds)
+libmodbus_cpp::ModbusConnection create_modbus_connection(const std::string& ip_address, int port, int timeout_seconds)
 {
-    caparoc::ModbusConnection conn(ip_address, port);
+    libmodbus_cpp::ModbusConnection conn(ip_address, port);
     conn.set_response_timeout(timeout_seconds, 0);
     
     if (!conn.connect())

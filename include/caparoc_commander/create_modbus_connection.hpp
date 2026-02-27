@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace caparoc {
+namespace libmodbus_cpp {
 class ModbusConnection;
 }
 
@@ -15,10 +15,10 @@ namespace cli {
  * @param ip_address IP address of the device
  * @param port Modbus TCP port
  * @param timeout_seconds Connection timeout in seconds
- * @return caparoc::ModbusConnection Connected ModbusConnection object
+ * @return libmodbus_cpp::ModbusConnection Connected ModbusConnection object
  * @throws std::runtime_error if connection fails
  */
-caparoc::ModbusConnection create_modbus_connection(const std::string& ip_address, int port, int timeout_seconds);
+libmodbus_cpp::ModbusConnection create_modbus_connection(const std::string& ip_address, int port, int timeout_seconds);
 
 } // namespace cli
 

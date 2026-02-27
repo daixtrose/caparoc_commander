@@ -1,5 +1,5 @@
 #include "caparoc/caparoc.hpp"
-#include "caparoc/modbus_connection.hpp"
+#include "libmodbus_cpp/modbus_connection.hpp"
 #include "caparoc_commander/cli_parser.hpp"
 #include "caparoc_commander/create_modbus_connection.hpp"
 
