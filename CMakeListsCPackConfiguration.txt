@@ -40,8 +40,7 @@ set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_VERBATIM_VARIABLES YES)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(CPACK_GENERATOR TGZ DEB)
-
+        set(CPACK_GENERATOR TGZ DEB RPM)
     # Debian maintainer scripts: symlink into /usr/local/bin
     set(EXECUTABLE_NAME "caparoc_commander")
     configure_file(

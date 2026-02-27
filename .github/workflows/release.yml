@@ -28,7 +28,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
@@ -47,7 +47,7 @@ jobs:
         run: |
           cpack --preset linux-x86_64-release
           mkdir -p artifacts
-          find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' \) -exec cp {} artifacts/ \;
+          find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

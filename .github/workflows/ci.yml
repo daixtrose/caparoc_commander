@@ -29,7 +29,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
@@ -47,10 +47,12 @@ jobs:
       - name: Package
         run: cpack --preset linux-x86_64-release
 
-      - name: Verify RUNPATH and .deb content
+      - name: Verify RUNPATH and package content
         run: |
           echo "=== .deb contents ==="
           dpkg -c build/linux-x86_64-release/*.deb
+          echo "=== .rpm contents ==="
+          rpm -qlp build/linux-x86_64-release/*.rpm
           echo "=== RUNPATH (installed binary) ==="
           dpkg -x build/linux-x86_64-release/*.deb /tmp/deb-extract
           readelf -d /tmp/deb-extract/opt/daixtrose/*/bin/* | grep -i -E 'runpath|rpath'
