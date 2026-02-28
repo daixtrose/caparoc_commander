@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 env:
@@ -26,15 +26,15 @@ jobs:
           if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
-
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
           wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
           echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Configure
         env:
@@ -45,9 +45,12 @@ jobs:
         run: cmake --build --preset linux-x86_64-release --parallel
 
       - name: Package
-        run: cpack --preset linux-x86_64-release
+        run: |
+          cpack --preset linux-x86_64-release
+          mkdir -p artifacts
+          find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
-      - name: Verify RUNPATH and package content
+      - name: Verify packages
         run: |
           echo "=== .deb contents ==="
           dpkg -c build/linux-x86_64-release/*.deb
@@ -61,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-x86_64
-          path: build/linux-x86_64-release/bin/caparoc_commander
+          path: artifacts/
 
   build-linux-aarch64:
     runs-on: ubuntu-24.04
@@ -78,15 +81,15 @@ jobs:
           if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
-
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
           wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
           echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Configure
         run: cmake --preset linux-aarch64-release
@@ -95,9 +98,12 @@ jobs:
         run: cmake --build --preset linux-aarch64-release --parallel
 
       - name: Package
-        run: cpack --preset linux-aarch64-release
+        run: |
+          cpack --preset linux-aarch64-release
+          mkdir -p artifacts
+          find build/linux-aarch64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
-      - name: Verify package content
+      - name: Verify packages
         run: |
           echo "=== .deb contents ==="
           dpkg -c build/linux-aarch64-release/*.deb
@@ -106,3 +112,9 @@ jobs:
           echo "=== RUNPATH (installed binary) ==="
           dpkg -x build/linux-aarch64-release/*.deb /tmp/deb-extract-aarch64
           aarch64-linux-gnu-readelf -d /tmp/deb-extract-aarch64/opt/daixtrose/*/bin/* | grep -i -E 'runpath|rpath'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caparoc-commander-linux-aarch64
+          path: artifacts/

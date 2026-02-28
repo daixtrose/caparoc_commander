@@ -25,15 +25,15 @@ jobs:
           if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
-
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
           wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
           echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Configure
         env:
@@ -70,15 +70,15 @@ jobs:
           if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
           git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
-
       - name: Install CMake ${{ env.CMAKE_VERSION }}
         run: |
           wget -qO- https://github.com/Kitware/CMake/releases/download/v${{ env.CMAKE_VERSION }}/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64.tar.gz | tar xz
           echo "$PWD/cmake-${{ env.CMAKE_VERSION }}-linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14-aarch64-linux-gnu gcc-14-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config autoconf automake libtool make gcc dpkg-dev rpm
 
       - name: Configure
         run: cmake --preset linux-aarch64-release
