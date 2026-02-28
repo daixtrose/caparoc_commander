@@ -98,9 +98,61 @@ jobs:
           name: caparoc-commander-linux-aarch64
           path: artifacts/
 
+  build-windows-x86_64:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            autoconf
+            automake
+            libtool
+            make
+            pkg-config
+            git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git credentials for FetchContent
+        run: |
+          TOKEN="${{ secrets.FETCHCONTENT_GH_TOKEN }}"
+          if [ -z "$TOKEN" ]; then TOKEN="${{ github.token }}"; fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - name: Configure
+        run: cmake --preset windows-x86_64-release
+
+      - name: Build
+        run: cmake --build --preset windows-x86_64-release --parallel
+
+      - name: Package
+        run: |
+          cpack --preset windows-x86_64-release
+          mkdir -p artifacts
+          find build/windows-x86_64-release -maxdepth 1 -type f -name '*.zip' -exec cp {} artifacts/ \;
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: caparoc-commander-windows-x86_64
+          path: artifacts/
+
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-linux-x86_64, build-linux-aarch64]
+    needs: [build-linux-x86_64, build-linux-aarch64, build-windows-x86_64]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -116,6 +168,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: caparoc-commander-linux-aarch64
+          path: artifacts
+
+      - name: Download Windows x86_64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: caparoc-commander-windows-x86_64
           path: artifacts
 
       - name: Create GitHub Release
