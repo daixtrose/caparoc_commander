@@ -142,6 +142,7 @@ jobs:
             libtool
             make
             pkg-config
+            gettext
             git
 
       - name: Checkout
@@ -155,6 +156,11 @@ jobs:
 
       - name: Configure
         run: cmake --preset windows-x86_64-release
+
+      - name: Prepare autotools
+        run: |
+          cd build/windows-x86_64-release/_deps/libmodbus-src
+          ./autogen.sh
 
       - name: Build
         run: cmake --build --preset windows-x86_64-release --parallel
