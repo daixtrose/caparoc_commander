@@ -6,8 +6,14 @@ project(caparoc_commander
     LANGUAGES CXX
 )
 
-include(FetchContent)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 include(GNUInstallDirs)
+include(FetchContent)
+
+option(CAPAROC_COMMANDER_ENABLE_CPACK "Enable CPack packaging support" ${PROJECT_IS_TOP_LEVEL})
 
 # ---------------------------------------------------------------------------
 # Dependencies – rebuilt from source
@@ -27,7 +33,7 @@ if(NOT TARGET CLI11::CLI11)
     FetchContent_Declare(
         cli11_proj
         GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-        GIT_TAG        v2.4.2
+        GIT_TAG        v2.6.1
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(cli11_proj)

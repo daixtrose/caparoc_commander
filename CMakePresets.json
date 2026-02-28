@@ -56,6 +56,20 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       }
+    },
+    {
+      "name": "windows-x86_64-release",
+      "displayName": "Windows x86_64 Release (MSYS2 MinGW)",
+      "inherits": "base",
+      "generator": "MSYS Makefiles",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     }
   ],
   "buildPresets": [
@@ -76,6 +90,12 @@
       "displayName": "Linux aarch64 Release",
       "configurePreset": "linux-aarch64-release",
       "configuration": "Release"
+    },
+    {
+      "name": "windows-x86_64-release",
+      "displayName": "Windows x86_64 Release",
+      "configurePreset": "windows-x86_64-release",
+      "configuration": "Release"
     }
   ],
   "packagePresets": [
@@ -90,6 +110,12 @@
       "displayName": "Linux aarch64 Packages",
       "configurePreset": "linux-aarch64-release",
       "generators": ["TGZ", "DEB", "RPM"]
+    },
+    {
+      "name": "windows-x86_64-release",
+      "displayName": "Windows x86_64 Packages",
+      "configurePreset": "windows-x86_64-release",
+      "generators": ["ZIP"]
     }
   ]
 }
