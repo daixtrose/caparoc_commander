@@ -24,6 +24,13 @@ install(TARGETS caparoc_commander
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# Install manpage (Linux only)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(FILES ${CMAKE_CURRENT_LIST_DIR}/doc/caparoc_commander.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
+    )
+endif()
+
 # Ship the libmodbus shared library (Linux only; on Windows, libmodbus is linked statically)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/libmodbus-install/lib/"

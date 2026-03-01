@@ -1,0 +1,200 @@
+.\" Manpage for caparoc_commander
+.\" Copyright (c) 2026 Markus Werle — MIT License
+.TH CAPAROC_COMMANDER 1 "March 2026" "caparoc_commander 0.4.0" "User Commands"
+.SH NAME
+caparoc_commander \- command\-line tool for Phoenix Contact CAPAROC systems
+.SH SYNOPSIS
+.B caparoc_commander
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B caparoc_commander
+communicates with Phoenix Contact CAPAROC circuit\-breaker systems over Modbus
+TCP.
+It exposes every register documented in the CAPAROC Modbus register map and
+provides high\-level convenience commands for device management, monitoring and
+configuration.
+.PP
+Multiple action flags can be combined in a single invocation; they are executed
+in the order given on the command line.
+.SH OPTIONS
+.SS Connection
+.TP
+\fB\-i\fR, \fB\-\-ip\fR \fIADDRESS\fR
+IP address of the CAPAROC device (default: \fB192.168.1.2\fR).
+.TP
+\fB\-p\fR, \fB\-\-port\fR \fIPORT\fR
+Modbus TCP port (default: \fB502\fR).
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR \fISECONDS\fR
+Connection timeout in seconds (default: \fB3\fR).
+.TP
+\fB\-d\fR, \fB\-\-debug\fR
+Enable debug output. Prints connection details and the parsed command\-line
+options.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show all available options and exit.
+.SS Register Discovery
+.TP
+\fB\-l\fR, \fB\-\-list\fR
+List every register in the CAPAROC register map.
+.TP
+\fB\-r\fR, \fB\-\-register\fR \fIADDRESS\fR
+Show detailed information about a single register.
+\fIADDRESS\fR is given in hexadecimal (e.g.\& \fB0x0010\fR).
+.TP
+\fB\-s\fR, \fB\-\-search\fR \fIPATTERN\fR
+Search registers by name using a case\-insensitive substring match.
+.SS Generic Register Access
+.TP
+\fB\-\-read\-uint16\fR \fIADDRESS\fR
+Read a single UINT16 register at the given hex address.
+.TP
+\fB\-\-read\-uint32\fR \fIADDRESS\fR
+Read a single UINT32 register at the given hex address.
+.TP
+\fB\-\-read\-string32\fR \fIADDRESS\fR
+Read a STRING32 (16\-word) register at the given hex address.
+.TP
+\fB\-\-write\-uint16\fR \fIADDRESS VALUE\fR
+Write \fIVALUE\fR to the UINT16 register at \fIADDRESS\fR.
+.TP
+\fB\-\-write\-uint32\fR \fIADDRESS VALUE\fR
+Write \fIVALUE\fR to the UINT32 register at \fIADDRESS\fR.
+.SS Coil Access
+.TP
+\fB\-\-read\-coil\fR \fIADDRESS\fR
+Read the status of a Modbus coil.
+.TP
+\fB\-\-write\-coil\fR \fIADDRESS STATE\fR
+Write a Modbus coil. \fISTATE\fR can be \fBon\fR, \fBoff\fR, \fBtrue\fR,
+\fBfalse\fR, \fB1\fR or \fB0\fR.
+.SS Device Information
+.TP
+\fB\-\-print\-device\-info\fR
+Print device information including modules, product names and channels.
+.TP
+\fB\-\-num\-connected\-modules\fR
+Get the number of currently connected modules.
+.TP
+\fB\-\-product\-name\-power\-module\fR
+Get the product name of the Power Module.
+.TP
+\fB\-\-product\-name\-module\fR \fIN\fR [\fIN\fR ...]
+Get the product name for one or more modules (1\(en16).
+.TP
+\fB\-\-product\-name\-quint\fR
+Get the product name of the QUINT Power Supply.
+.SS System and Channel Status
+.TP
+\fB\-\-get\-system\-status\fR
+Show system\-level status including voltage, current, temperature and global
+status flags (undervoltage, overvoltage, cumulative errors, etc.).
+.TP
+\fB\-\-get\-channel\-status\fR \fIMODULE CHANNEL\fR
+Show detailed status flags for a specific channel (80% warning, overload,
+short circuit, hardware error, voltage error, etc.).
+.TP
+\fB\-\-get\-load\-current\fR \fIMODULE CHANNEL\fR
+Get the actual load current for a specific channel in amps and milliamps.
+.SS Channel Control
+.TP
+\fB\-\-control\-channel\fR \fIMODULE CHANNEL STATE\fR
+Switch a channel on or off. \fISTATE\fR is \fBon\fR or \fBoff\fR.
+.SS Nominal Current Management
+.TP
+\fB\-\-get\-nominal\-current\fR \fIMODULE CHANNEL\fR
+Read the configured nominal current for a channel.
+.TP
+\fB\-\-set\-nominal\-current\fR \fIMODULE CHANNEL VALUE\fR
+Set the nominal current for a channel to \fIVALUE\fR amperes.
+.TP
+\fB\-\-unlock\-nominal\-current\fR \fIMODULE CHANNEL\fR
+Unlock nominal current parametrization by clearing both the global lock and
+the per\-channel lock.
+.SS Reset Commands
+.TP
+\fB\-\-reset\-application\-params\-power\-and\-cb\fR
+Reset application parameters for the Power Module and all Circuit Breakers.
+.TP
+\fB\-\-global\-channel\-error\-reset\-all\-cb\fR
+Perform a global channel error reset for all Circuit Breakers.
+.TP
+\fB\-\-error\-counter\-reset\-all\-cb\fR
+Reset the error counters for all Circuit Breakers.
+.TP
+\fB\-\-reset\-application\-params\-quint\fR
+Reset application parameters for the QUINT Power Supply.
+.SH EXAMPLES
+List all registers:
+.PP
+.RS 4
+.nf
+caparoc_commander \-l
+.fi
+.RE
+.PP
+Search for voltage\-related registers:
+.PP
+.RS 4
+.nf
+caparoc_commander \-s voltage
+.fi
+.RE
+.PP
+Print device information:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-print\-device\-info
+.fi
+.RE
+.PP
+Read the system status and channel 2 of module 1:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-get\-system\-status \-\-get\-channel\-status 1 2
+.fi
+.RE
+.PP
+Turn off module 1 channel 3:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-control\-channel 1 3 off
+.fi
+.RE
+.PP
+Unlock and set nominal current:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-unlock\-nominal\-current 1 1 \-\-set\-nominal\-current 1 1 4
+.fi
+.RE
+.PP
+Connect to a device at a non\-default address:
+.PP
+.RS 4
+.nf
+caparoc_commander \-i 10.0.0.50 \-p 5020 \-\-get\-system\-status
+.fi
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Successful execution.
+.TP
+.B 1
+An error occurred (connection failure, invalid arguments, device error).
+.SH SEE ALSO
+.PP
+Project repository: \fIhttps://github.com/daixtrose/caparoc_commander\fR
+.PP
+Phoenix Contact CAPAROC documentation:
+\fIhttps://www.phoenixcontact.com/en\-us/products/caparoc\fR
+.SH AUTHOR
+Markus Werle
+.SH LICENSE
+MIT License. See the LICENSE file in the source distribution.

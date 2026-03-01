@@ -1,3 +1,4 @@
 #!/bin/sh
 set -e
 rm -f /usr/local/bin/@EXECUTABLE_NAME@
+rm -f /usr/local/share/man/man1/@EXECUTABLE_NAME@.1
