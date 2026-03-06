@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25...4.2)
 
 project(caparoc_commander
-    VERSION 0.7.0
+    VERSION 0.7.1
     DESCRIPTION "CLI commander for CAPAROC systems"
     LANGUAGES CXX
 )
@@ -23,7 +23,7 @@ if(NOT TARGET caparoc)
     FetchContent_Declare(
         libcaparoc_proj
         GIT_REPOSITORY https://github.com/daixtrose/libcaparoc.git
-        GIT_TAG        v0.6.0
+        GIT_TAG        v0.6.1
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(libcaparoc_proj)
