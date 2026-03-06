@@ -85,6 +85,28 @@ jobs:
           mkdir -p artifacts
           find build/linux-aarch64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
+      - name: Verify Bookworm compatibility
+        run: |
+          set -euo pipefail
+          dpkg -x build/linux-aarch64-release/*.deb /tmp/bookworm-compat-check
+          MAX_GLIBC="2.36"
+          echo "Checking all ELF binaries require at most GLIBC ${MAX_GLIBC} ..."
+          fail=0
+          for f in $(find /tmp/bookworm-compat-check -type f); do
+            file "$f" | grep -q "ELF" || continue
+            max=$(readelf -V "$f" 2>/dev/null \
+              | grep -oP 'GLIBC_\K[0-9.]+' | sort -V -u | tail -1)
+            [ -z "$max" ] && continue
+            if [ "$(printf '%s\n%s' "$MAX_GLIBC" "$max" | sort -V | tail -1)" != "$MAX_GLIBC" ]; then
+              echo "::error::$(basename "$f") requires GLIBC ${max} (max allowed: ${MAX_GLIBC})"
+              readelf --dyn-syms -W "$f" | grep -vE 'GLIBC_2\.(1[0-9]|2[0-9]|3[0-6])' | grep 'GLIBC_' || true
+              fail=1
+            else
+              echo "✓ $(basename "$f"): GLIBC ${max}"
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
