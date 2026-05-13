@@ -85,7 +85,8 @@ jobs:
           mkdir -p artifacts
           find build/linux-aarch64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
-      - name: Verify Bookworm compatibility
+      - name: Verify Trixie compatibility (GLIBC <= 2.41)
+        shell: bash
         run: |
           set -euo pipefail
           dpkg -x build/linux-aarch64-release/*.deb /tmp/trixie-compat-check

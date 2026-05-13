@@ -108,7 +108,8 @@ jobs:
           dpkg -x build/linux-aarch64-release/*.deb /tmp/deb-extract-aarch64
           aarch64-linux-gnu-readelf -d /tmp/deb-extract-aarch64/opt/daixtrose/*/bin/* | grep -i -E 'runpath|rpath'
 
-      - name: Verify Bookworm compatibility
+      - name: Verify Trixie compatibility (GLIBC <= 2.41)
+        shell: bash
         run: |
           set -euo pipefail
           dpkg -x build/linux-aarch64-release/*.deb /tmp/trixie-compat-check
