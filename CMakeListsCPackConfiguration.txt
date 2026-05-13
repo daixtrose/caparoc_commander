@@ -4,8 +4,10 @@
 set(CPACK_PACKAGE_NAME "caparoc-commander")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CAPAROC_COMMANDER_ENABLE_CPACK)
-    # Install to private prefix under /opt
-    set(INSTALL_PREFIX "/opt/daixtrose/${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}")
+    # Install to private prefix under /opt (unversioned — single
+    # version installed per system; aligns with the smarcel-core-*
+    # v0.2.x layout decided alongside the Trixie migration).
+    set(INSTALL_PREFIX "/opt/daixtrose/${CPACK_PACKAGE_NAME}")
     set(CMAKE_INSTALL_PREFIX ${INSTALL_PREFIX} CACHE PATH "" FORCE)
     set(CPACK_PACKAGING_INSTALL_PREFIX ${INSTALL_PREFIX})
 
@@ -48,6 +50,12 @@ if(CAPAROC_COMMANDER_ENABLE_CPACK)
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Markus Werle")
     set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
     set(CPACK_VERBATIM_VARIABLES YES)
+
+    # Runtime deps — libcaparoc + libmodbus are bundled, but libc /
+    # libstdc++ come from Trixie.  Operator installs via:
+    #     sudo apt install ./caparoc-commander_<ver>_arm64.deb
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.41), libstdc++6")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
 
     # Standard naming with architecture: <pkg>_<ver>_<arch>.deb / <pkg>-<ver>-<rel>.<arch>.rpm
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)

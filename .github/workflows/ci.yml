@@ -71,7 +71,7 @@ jobs:
   build-linux-aarch64:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/daixtrose/cross-build-bookworm-arm64:latest
+      image: ghcr.io/daixtrose/cross-build-trixie-arm64:latest
     permissions:
       contents: read
       packages: read
@@ -111,11 +111,11 @@ jobs:
       - name: Verify Bookworm compatibility
         run: |
           set -euo pipefail
-          dpkg -x build/linux-aarch64-release/*.deb /tmp/bookworm-compat-check
-          MAX_GLIBC="2.36"
+          dpkg -x build/linux-aarch64-release/*.deb /tmp/trixie-compat-check
+          MAX_GLIBC="2.41"
           echo "Checking all ELF binaries require at most GLIBC ${MAX_GLIBC} ..."
           fail=0
-          for f in $(find /tmp/bookworm-compat-check -type f); do
+          for f in $(find /tmp/trixie-compat-check -type f); do
             file "$f" | grep -q "ELF" || continue
             max=$(readelf -V "$f" 2>/dev/null \
               | grep -oP 'GLIBC_\K[0-9.]+' | sort -V -u | tail -1)
