@@ -50,7 +50,7 @@ jobs:
           find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ !startsWith(github.server_url, 'https://scm.ird-cloud.de') }}
+        if: ${{ !vars.IS_SCM == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-x86_64
@@ -110,7 +110,7 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
 
       - name: Upload artifacts
-        if: ${{ !startsWith(github.server_url, 'https://scm.ird-cloud.de') }}
+        if: ${{ !vars.IS_SCM == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-aarch64
@@ -169,7 +169,7 @@ jobs:
           find build/windows-x86_64-release -maxdepth 1 -type f -name '*.zip' -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ !startsWith(github.server_url, 'https://scm.ird-cloud.de') }}
+        if: ${{ !vars.IS_SCM == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-windows-x86_64
@@ -204,7 +204,7 @@ jobs:
       # ── Upload arm64 .deb to scm.ird-cloud.de Debian registry ────
       # See cpp-java-package-distribution-proposal.md §4.3 / §5.5.
       - name: Upload .deb to scm.ird-cloud.de registry
-        if: startsWith(github.server_url, 'https://scm.ird-cloud.de')
+        if: vars.IS_SCM == 'true'
         env:
           SCM_USER:         ird-deb-publisher
           SCM_TOKEN:        ${{ secrets.SCM_DEB_PUBLISHER_TOKEN }}
@@ -227,20 +227,21 @@ jobs:
           echo "✓ uploaded $(basename "${DEB}") (HTTP $HTTP)"
 
       - name: Create GitHub Release
-        if: github.server_url == 'https://github.com'
+        if: ${{ github.server_url == 'https://github.com' && vars.IS_SCM != 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/*
 
       - name: Create Forgejo / Gitea Release
-        if: github.server_url != 'https://github.com'
+        if: ${{ vars.IS_SCM == 'true' || github.server_url != 'https://github.com' }}
         shell: bash
         env:
           API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_HOST: ${{ vars.IS_SCM == 'true' && 'https://scm.ird-cloud.de' || github.server_url }}
         run: |
           set -euo pipefail
-          API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          API="${GITEA_HOST}/api/v1/repos/${GITHUB_REPOSITORY}"
           TAG="${GITHUB_REF_NAME}"
           BODY=$(printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":false}' "$TAG" "$TAG")
           RESP=$(curl -sS -X POST -H "Authorization: token ${API_TOKEN}" -H "Content-Type: application/json" \
