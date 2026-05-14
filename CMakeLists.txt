@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25...4.2)
 
 project(caparoc_commander
-    VERSION 1.0.3
+    VERSION 1.0.4
     DESCRIPTION "CLI commander for CAPAROC systems"
     LANGUAGES CXX
 )
