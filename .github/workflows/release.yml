@@ -198,8 +198,59 @@ jobs:
           name: caparoc-commander-windows-x86_64
           path: artifacts
 
+      # ── Upload arm64 .deb to scm.ird-cloud.de Debian registry ────
+      # See cpp-java-package-distribution-proposal.md §4.3 / §5.5.
+      - name: Upload .deb to scm.ird-cloud.de registry
+        if: github.server_url == 'https://scm.ird-cloud.de'
+        env:
+          SCM_USER:         ird-deb-publisher
+          SCM_TOKEN:        ${{ secrets.SCM_DEB_PUBLISHER_TOKEN }}
+          TARGET_SUITE:     trixie
+          TARGET_COMPONENT: main
+        run: |
+          set -euo pipefail
+          DEB=$(ls artifacts/*_arm64.deb 2>/dev/null)
+          if [ -z "$DEB" ]; then echo "::error::no arm64 deb in artifacts/"; exit 1; fi
+          URL="https://scm.ird-cloud.de/api/packages/ird/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
+          HTTP=$(curl -sS -X PUT \
+                      --user "${SCM_USER}:${SCM_TOKEN}" \
+                      --upload-file "${DEB}" \
+                      -o /tmp/upload.resp -w "%{http_code}" "${URL}")
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "::error::upload failed (HTTP $HTTP)"
+            head -c 500 /tmp/upload.resp; echo
+            exit 1
+          fi
+          echo "✓ uploaded $(basename "${DEB}") (HTTP $HTTP)"
+
       - name: Create GitHub Release
+        if: github.server_url == 'https://github.com'
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/*
+
+      - name: Create Forgejo / Gitea Release
+        if: github.server_url != 'https://github.com'
+        shell: bash
+        env:
+          API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          API="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}"
+          TAG="${GITHUB_REF_NAME}"
+          BODY=$(printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":false}' "$TAG" "$TAG")
+          RESP=$(curl -sS -X POST -H "Authorization: token ${API_TOKEN}" -H "Content-Type: application/json" \
+                      -d "$BODY" "${API}/releases" 2>/dev/null || true)
+          REL_ID=$(echo "$RESP" | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -1)
+          if [ -z "$REL_ID" ]; then
+            REL_ID=$(curl -fsS -H "Authorization: token ${API_TOKEN}" "${API}/releases/tags/${TAG}" \
+                     | sed -n 's/.*"id":\([0-9]*\).*/\1/p' | head -1)
+          fi
+          for f in artifacts/*; do
+            curl -fsS -X POST -H "Authorization: token ${API_TOKEN}" \
+                 -H "Content-Type: application/octet-stream" \
+                 --data-binary "@${f}" \
+                 "${API}/releases/${REL_ID}/assets?name=$(basename "$f")" >/dev/null
+            echo "  ✓ attached $(basename "$f")"
+          done
