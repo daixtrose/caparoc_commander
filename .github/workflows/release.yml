@@ -152,11 +152,14 @@ jobs:
         env:
           API_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           GITEA_HOST: https://scm.ird-cloud.de
+          REPO_NAME:  ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
           command -v curl >/dev/null 2>&1 || \
               (apt-get update && apt-get install -y --no-install-recommends curl)
-          API="${GITEA_HOST}/api/v1/repos/${GITHUB_REPOSITORY}"
+          # Hardcode org=ird; GITHUB_REPOSITORY on Forgejo pull-mirrors can
+          # resolve to the upstream path and 404 on POST.
+          API="${GITEA_HOST}/api/v1/repos/ird/${REPO_NAME}"
           TAG="${GITHUB_REF_NAME}"
           GET_HTTP=$(curl -sS -o /tmp/rel.json -w "%{http_code}" \
                           -H "Authorization: token ${API_TOKEN}" \
@@ -317,7 +320,9 @@ jobs:
           GITEA_HOST: ${{ vars.IS_SCM == 'true' && 'https://scm.ird-cloud.de' || github.server_url }}
         run: |
           set -euo pipefail
-          API="${GITEA_HOST}/api/v1/repos/${GITHUB_REPOSITORY}"
+          # Hardcode org=ird; GITHUB_REPOSITORY on Forgejo pull-mirrors can
+          # resolve to the upstream path and 404 on POST.
+          API="${GITEA_HOST}/api/v1/repos/ird/${REPO_NAME}"
           TAG="${GITHUB_REF_NAME}"
           BODY=$(printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":false}' "$TAG" "$TAG")
           RESP=$(curl -sS -X POST -H "Authorization: token ${API_TOKEN}" -H "Content-Type: application/json" \
