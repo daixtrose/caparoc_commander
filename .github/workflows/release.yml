@@ -50,6 +50,7 @@ jobs:
           find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
+        if: github.server_url != 'https://scm.ird-cloud.de'
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-x86_64
@@ -109,6 +110,7 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
 
       - name: Upload artifacts
+        if: github.server_url != 'https://scm.ird-cloud.de'
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-aarch64
@@ -167,6 +169,7 @@ jobs:
           find build/windows-x86_64-release -maxdepth 1 -type f -name '*.zip' -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
+        if: github.server_url != 'https://scm.ird-cloud.de'
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-windows-x86_64
