@@ -62,6 +62,9 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: ${{ vars.IS_SCM == 'true' && 'scm.ird-cloud.de/ird/cross-build-trixie-arm64:latest' || 'ghcr.io/daixtrose/cross-build-trixie-arm64:latest' }}
+      credentials:
+        username: ${{ vars.IS_SCM == 'true' && 'ird-deb-publisher' || '' }}
+        password: ${{ vars.IS_SCM == 'true' && secrets.SCM_DEB_PUBLISHER_TOKEN || '' }}
     permissions:
       contents: write
       packages: read
