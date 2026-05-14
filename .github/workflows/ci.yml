@@ -14,6 +14,7 @@ env:
 
 jobs:
   build-linux-x86_64:
+    if: ${{ vars.PUBLISH_HOST == '' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -140,6 +141,7 @@ jobs:
           path: artifacts/
 
   build-windows-x86_64:
+    if: ${{ vars.PUBLISH_HOST == '' }}
     runs-on: windows-latest
     permissions:
       contents: read
