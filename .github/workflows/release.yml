@@ -127,6 +127,8 @@ jobs:
         env:
           PUBLISH_USER:     ${{ vars.PUBLISH_USER }}
           PUBLISH_TOKEN:    ${{ secrets.PUBLISH_TOKEN }}
+          PUBLISH_HOST:    ${{ vars.PUBLISH_HOST }}
+          PUBLISH_ORG:     ${{ vars.PUBLISH_ORG }}
           TARGET_SUITE:     trixie
           TARGET_COMPONENT: main
         run: |
@@ -151,6 +153,7 @@ jobs:
         env:
           API_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           GITEA_HOST: ${{ format('https://{0}', vars.PUBLISH_HOST) }}
+          PUBLISH_ORG: ${{ vars.PUBLISH_ORG }}
           REPO_NAME:  ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
@@ -284,6 +287,8 @@ jobs:
         env:
           PUBLISH_USER:     ${{ vars.PUBLISH_USER }}
           PUBLISH_TOKEN:    ${{ secrets.PUBLISH_TOKEN }}
+          PUBLISH_HOST:    ${{ vars.PUBLISH_HOST }}
+          PUBLISH_ORG:     ${{ vars.PUBLISH_ORG }}
           TARGET_SUITE:     trixie
           TARGET_COMPONENT: main
         run: |
@@ -315,6 +320,7 @@ jobs:
         env:
           API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITEA_HOST: ${{ vars.PUBLISH_HOST != '' && format('https://{0}', vars.PUBLISH_HOST) || github.server_url }}
+          PUBLISH_ORG: ${{ vars.PUBLISH_ORG }}
         run: |
           set -euo pipefail
           # resolve to the upstream path and 404 on POST.
