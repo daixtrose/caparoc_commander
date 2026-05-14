@@ -11,8 +11,7 @@ env:
 
 jobs:
   build-linux-x86_64:
-    # x86_64 build is for GitHub Releases only; scm publishes only arm64.
-    if: ${{ vars.IS_SCM != 'true' }}
+    if: ${{ vars.PUBLISH_HOST == '' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -52,7 +51,7 @@ jobs:
           find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ vars.IS_SCM != 'true' }}
+        if: ${{ vars.PUBLISH_HOST == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-x86_64
@@ -61,10 +60,10 @@ jobs:
   build-linux-aarch64:
     runs-on: ubuntu-24.04
     container:
-      image: ${{ vars.IS_SCM == 'true' && 'scm.ird-cloud.de/ird/cross-build-trixie-arm64:latest' || 'ghcr.io/daixtrose/cross-build-trixie-arm64:latest' }}
+      image: ${{ vars.PUBLISH_HOST != '' && format('{0}/{1}/cross-build-trixie-arm64:latest', vars.PUBLISH_HOST, vars.PUBLISH_ORG) || 'ghcr.io/daixtrose/cross-build-trixie-arm64:latest' }}
       credentials:
-        username: ${{ vars.IS_SCM == 'true' && 'ird-deb-publisher' || '' }}
-        password: ${{ vars.IS_SCM == 'true' && secrets.SCM_DEB_PUBLISHER_TOKEN || '' }}
+        username: ${{ vars.PUBLISH_HOST != '' && vars.PUBLISH_USER || '' }}
+        password: ${{ vars.PUBLISH_HOST != '' && secrets.PUBLISH_TOKEN || '' }}
     permissions:
       contents: write
       packages: read
@@ -115,19 +114,19 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
 
       - name: Upload artifacts
-        if: ${{ vars.IS_SCM != 'true' }}
+        if: ${{ vars.PUBLISH_HOST == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-aarch64
           path: artifacts/
 
       # ── Forgejo path: publish arm64 deb from this job ────────────
-      - name: Upload .deb to scm.ird-cloud.de registry (Forgejo path)
-        if: ${{ vars.IS_SCM == 'true' && startsWith(github.ref, 'refs/tags/v') }}
+      - name: Upload .deb to internal Debian registry (internal path)
+        if: ${{ vars.PUBLISH_HOST != '' && startsWith(github.ref, 'refs/tags/v') }}
         shell: bash
         env:
-          SCM_USER:         ird-deb-publisher
-          SCM_TOKEN:        ${{ secrets.SCM_DEB_PUBLISHER_TOKEN }}
+          PUBLISH_USER:     ${{ vars.PUBLISH_USER }}
+          PUBLISH_TOKEN:    ${{ secrets.PUBLISH_TOKEN }}
           TARGET_SUITE:     trixie
           TARGET_COMPONENT: main
         run: |
@@ -136,8 +135,8 @@ jobs:
               (apt-get update && apt-get install -y --no-install-recommends curl)
           DEB=$(ls artifacts/*_arm64.deb 2>/dev/null)
           if [ -z "$DEB" ]; then echo "::error::no arm64 deb in artifacts/"; exit 1; fi
-          URL="https://scm.ird-cloud.de/api/packages/ird/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
-          HTTP=$(curl -sS -X PUT --user "${SCM_USER}:${SCM_TOKEN}" --upload-file "${DEB}" \
+          URL="https://${PUBLISH_HOST}/api/packages/${PUBLISH_ORG}/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
+          HTTP=$(curl -sS -X PUT --user "${PUBLISH_USER}:${PUBLISH_TOKEN}" --upload-file "${DEB}" \
                       -o /tmp/upload.resp -w "%{http_code}" "${URL}")
           if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
             echo "::error::upload failed (HTTP $HTTP)"
@@ -146,20 +145,19 @@ jobs:
           fi
           echo "✓ uploaded $(basename "${DEB}") (HTTP $HTTP)"
 
-      - name: Create Forgejo Release (Forgejo path)
-        if: ${{ vars.IS_SCM == 'true' && startsWith(github.ref, 'refs/tags/v') }}
+      - name: Create internal Release (internal path)
+        if: ${{ vars.PUBLISH_HOST != '' && startsWith(github.ref, 'refs/tags/v') }}
         shell: bash
         env:
           API_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
-          GITEA_HOST: https://scm.ird-cloud.de
+          GITEA_HOST: ${{ format('https://{0}', vars.PUBLISH_HOST) }}
           REPO_NAME:  ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
           command -v curl >/dev/null 2>&1 || \
               (apt-get update && apt-get install -y --no-install-recommends curl)
-          # Hardcode org=ird; GITHUB_REPOSITORY on Forgejo pull-mirrors can
           # resolve to the upstream path and 404 on POST.
-          API="${GITEA_HOST}/api/v1/repos/ird/${REPO_NAME}"
+          API="${GITEA_HOST}/api/v1/repos/${PUBLISH_ORG}/${REPO_NAME}"
           TAG="${GITHUB_REF_NAME}"
           GET_HTTP=$(curl -sS -o /tmp/rel.json -w "%{http_code}" \
                           -H "Authorization: token ${API_TOKEN}" \
@@ -194,7 +192,7 @@ jobs:
 
   build-windows-x86_64:
     # Windows build is for GitHub Releases only.  Skip on Forgejo.
-    if: ${{ vars.IS_SCM != 'true' }}
+    if: ${{ vars.PUBLISH_HOST == '' }}
     runs-on: windows-latest
     permissions:
       contents: read
@@ -247,7 +245,7 @@ jobs:
           find build/windows-x86_64-release -maxdepth 1 -type f -name '*.zip' -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ vars.IS_SCM != 'true' }}
+        if: ${{ vars.PUBLISH_HOST == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-windows-x86_64
@@ -255,7 +253,7 @@ jobs:
 
   publish:
     # Job 2 runs only on GitHub; on Forgejo aarch64 publishes itself.
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.IS_SCM != 'true' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_HOST == '' }}
     needs: [build-linux-x86_64, build-linux-aarch64, build-windows-x86_64]
     runs-on: ubuntu-24.04
     permissions:
@@ -280,22 +278,21 @@ jobs:
           name: caparoc-commander-windows-x86_64
           path: artifacts
 
-      # ── Upload arm64 .deb to scm.ird-cloud.de Debian registry ────
       # See cpp-java-package-distribution-proposal.md §4.3 / §5.5.
-      - name: Upload .deb to scm.ird-cloud.de registry
-        if: vars.IS_SCM == 'true'
+      - name: Upload .deb to internal Debian registry
+        if: vars.PUBLISH_HOST != ''
         env:
-          SCM_USER:         ird-deb-publisher
-          SCM_TOKEN:        ${{ secrets.SCM_DEB_PUBLISHER_TOKEN }}
+          PUBLISH_USER:     ${{ vars.PUBLISH_USER }}
+          PUBLISH_TOKEN:    ${{ secrets.PUBLISH_TOKEN }}
           TARGET_SUITE:     trixie
           TARGET_COMPONENT: main
         run: |
           set -euo pipefail
           DEB=$(ls artifacts/*_arm64.deb 2>/dev/null)
           if [ -z "$DEB" ]; then echo "::error::no arm64 deb in artifacts/"; exit 1; fi
-          URL="https://scm.ird-cloud.de/api/packages/ird/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
+          URL="https://${PUBLISH_HOST}/api/packages/${PUBLISH_ORG}/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
           HTTP=$(curl -sS -X PUT \
-                      --user "${SCM_USER}:${SCM_TOKEN}" \
+                      --user "${PUBLISH_USER}:${PUBLISH_TOKEN}" \
                       --upload-file "${DEB}" \
                       -o /tmp/upload.resp -w "%{http_code}" "${URL}")
           if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
@@ -306,23 +303,22 @@ jobs:
           echo "✓ uploaded $(basename "${DEB}") (HTTP $HTTP)"
 
       - name: Create GitHub Release
-        if: ${{ github.server_url == 'https://github.com' && vars.IS_SCM != 'true' }}
+        if: ${{ github.server_url == 'https://github.com' && vars.PUBLISH_HOST == '' }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/*
 
-      - name: Create Forgejo / Gitea Release
-        if: ${{ vars.IS_SCM == 'true' || github.server_url != 'https://github.com' }}
+      - name: Create internal forge release
+        if: ${{ vars.PUBLISH_HOST != '' || github.server_url != 'https://github.com' }}
         shell: bash
         env:
           API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITEA_HOST: ${{ vars.IS_SCM == 'true' && 'https://scm.ird-cloud.de' || github.server_url }}
+          GITEA_HOST: ${{ vars.PUBLISH_HOST != '' && format('https://{0}', vars.PUBLISH_HOST) || github.server_url }}
         run: |
           set -euo pipefail
-          # Hardcode org=ird; GITHUB_REPOSITORY on Forgejo pull-mirrors can
           # resolve to the upstream path and 404 on POST.
-          API="${GITEA_HOST}/api/v1/repos/ird/${REPO_NAME}"
+          API="${GITEA_HOST}/api/v1/repos/${PUBLISH_ORG}/${REPO_NAME}"
           TAG="${GITHUB_REF_NAME}"
           BODY=$(printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":false}' "$TAG" "$TAG")
           RESP=$(curl -sS -X POST -H "Authorization: token ${API_TOKEN}" -H "Content-Type: application/json" \
