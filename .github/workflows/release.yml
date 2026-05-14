@@ -11,6 +11,8 @@ env:
 
 jobs:
   build-linux-x86_64:
+    # x86_64 build is for GitHub Releases only; scm publishes only arm64.
+    if: ${{ vars.IS_SCM != 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -50,7 +52,7 @@ jobs:
           find build/linux-x86_64-release -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ !vars.IS_SCM == 'true' }}
+        if: ${{ vars.IS_SCM != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-x86_64
@@ -59,9 +61,9 @@ jobs:
   build-linux-aarch64:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/daixtrose/cross-build-trixie-arm64:latest
+      image: ${{ vars.IS_SCM == 'true' && 'scm.ird-cloud.de/ird/cross-build-trixie-arm64:latest' || 'ghcr.io/daixtrose/cross-build-trixie-arm64:latest' }}
     permissions:
-      contents: read
+      contents: write
       packages: read
 
     steps:
@@ -110,13 +112,83 @@ jobs:
           [ "$fail" -eq 0 ] || exit 1
 
       - name: Upload artifacts
-        if: ${{ !vars.IS_SCM == 'true' }}
+        if: ${{ vars.IS_SCM != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-linux-aarch64
           path: artifacts/
 
+      # ── Forgejo path: publish arm64 deb from this job ────────────
+      - name: Upload .deb to scm.ird-cloud.de registry (Forgejo path)
+        if: ${{ vars.IS_SCM == 'true' && startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        env:
+          SCM_USER:         ird-deb-publisher
+          SCM_TOKEN:        ${{ secrets.SCM_DEB_PUBLISHER_TOKEN }}
+          TARGET_SUITE:     trixie
+          TARGET_COMPONENT: main
+        run: |
+          set -euo pipefail
+          command -v curl >/dev/null 2>&1 || \
+              (apt-get update && apt-get install -y --no-install-recommends curl)
+          DEB=$(ls artifacts/*_arm64.deb 2>/dev/null)
+          if [ -z "$DEB" ]; then echo "::error::no arm64 deb in artifacts/"; exit 1; fi
+          URL="https://scm.ird-cloud.de/api/packages/ird/debian/pool/${TARGET_SUITE}/${TARGET_COMPONENT}/upload"
+          HTTP=$(curl -sS -X PUT --user "${SCM_USER}:${SCM_TOKEN}" --upload-file "${DEB}" \
+                      -o /tmp/upload.resp -w "%{http_code}" "${URL}")
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "::error::upload failed (HTTP $HTTP)"
+            head -c 500 /tmp/upload.resp; echo
+            exit 1
+          fi
+          echo "✓ uploaded $(basename "${DEB}") (HTTP $HTTP)"
+
+      - name: Create Forgejo Release (Forgejo path)
+        if: ${{ vars.IS_SCM == 'true' && startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        env:
+          API_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          GITEA_HOST: https://scm.ird-cloud.de
+        run: |
+          set -euo pipefail
+          command -v curl >/dev/null 2>&1 || \
+              (apt-get update && apt-get install -y --no-install-recommends curl)
+          API="${GITEA_HOST}/api/v1/repos/${GITHUB_REPOSITORY}"
+          TAG="${GITHUB_REF_NAME}"
+          GET_HTTP=$(curl -sS -o /tmp/rel.json -w "%{http_code}" \
+                          -H "Authorization: token ${API_TOKEN}" \
+                          "${API}/releases/tags/${TAG}")
+          if [ "$GET_HTTP" = "200" ]; then
+            REL_ID=$(grep -oE '"id":[0-9]+' /tmp/rel.json | head -1 | grep -oE '[0-9]+')
+          else
+            BODY=$(printf '{"tag_name":"%s","name":"%s","draft":false,"prerelease":false}' "$TAG" "$TAG")
+            POST_HTTP=$(curl -sS -o /tmp/rel.json -w "%{http_code}" \
+                             -X POST -H "Authorization: token ${API_TOKEN}" \
+                             -H "Content-Type: application/json" -d "$BODY" "${API}/releases")
+            if [ "$POST_HTTP" -lt 200 ] || [ "$POST_HTTP" -ge 300 ]; then
+              echo "::error::release create failed (HTTP $POST_HTTP)"
+              head -c 500 /tmp/rel.json; echo
+              exit 1
+            fi
+            REL_ID=$(grep -oE '"id":[0-9]+' /tmp/rel.json | head -1 | grep -oE '[0-9]+')
+          fi
+          [ -n "${REL_ID:-}" ] || { echo "::error::could not resolve release id"; exit 1; }
+          for f in artifacts/*; do
+            UP=$(curl -sS -o /tmp/asset.json -w "%{http_code}" -X POST \
+                       -H "Authorization: token ${API_TOKEN}" \
+                       -F "attachment=@${f}" \
+                       "${API}/releases/${REL_ID}/assets?name=$(basename "$f")")
+            if [ "$UP" -lt 200 ] || [ "$UP" -ge 300 ]; then
+              echo "::error::asset upload failed for $(basename "$f") (HTTP $UP)"
+              head -c 500 /tmp/asset.json; echo
+              exit 1
+            fi
+            echo "  ✓ attached $(basename "$f") (HTTP $UP)"
+          done
+
   build-windows-x86_64:
+    # Windows build is for GitHub Releases only.  Skip on Forgejo.
+    if: ${{ vars.IS_SCM != 'true' }}
     runs-on: windows-latest
     permissions:
       contents: read
@@ -169,14 +241,15 @@ jobs:
           find build/windows-x86_64-release -maxdepth 1 -type f -name '*.zip' -exec cp {} artifacts/ \;
 
       - name: Upload artifacts
-        if: ${{ !vars.IS_SCM == 'true' }}
+        if: ${{ vars.IS_SCM != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: caparoc-commander-windows-x86_64
           path: artifacts/
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Job 2 runs only on GitHub; on Forgejo aarch64 publishes itself.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && vars.IS_SCM != 'true' }}
     needs: [build-linux-x86_64, build-linux-aarch64, build-windows-x86_64]
     runs-on: ubuntu-24.04
     permissions:
