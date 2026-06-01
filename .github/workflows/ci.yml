@@ -73,10 +73,7 @@ jobs:
   build-linux-aarch64:
     runs-on: ubuntu-24.04
     container:
-      image: ${{ format('{0}/{1}/cross-build-trixie-arm64:latest', vars.PUBLISH_HOST, vars.PUBLISH_ORG) }}
-      credentials:
-        username: ${{ vars.PUBLISH_USER }}
-        password: ${{ secrets.PUBLISH_TOKEN }}
+      image: ghcr.io/daixtrose/cross-build-trixie-arm64:latest
     permissions:
       contents: read
       packages: read
