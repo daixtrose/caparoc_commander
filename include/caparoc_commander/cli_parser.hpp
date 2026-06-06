@@ -32,6 +32,7 @@ enum class CommandLineAction {
     GET_SYSTEM_STATUS,
     GET_CHANNEL_STATUS,
     GET_LOAD_CURRENT,
+    GET_ALL_CHANNELS,
     CONTROL_CHANNEL,
     READ_COIL,
     WRITE_COIL
@@ -104,7 +105,8 @@ struct CommandLineOptions {
     std::vector<CoilArgs> read_coil_args;
     std::vector<CoilWriteArgs> write_coil_args;
     bool debug = false;
-}; 
+    bool json_output = false;   // machine-readable output (currently for --get-all-channels)
+};
 
 CommandLineOptions parse_command_line(int argc, char* argv[]);
 std::string dump_command_line_options(const CommandLineOptions& options);

@@ -148,7 +148,12 @@ namespace cli
                               { options.actions.push_back(CommandLineAction::PRINT_DEVICE_INFO); }, "Print device information (modules, product names, channels)");
         app.add_flag_callback("--get-system-status", [&options]()
                               { options.actions.push_back(CommandLineAction::GET_SYSTEM_STATUS); }, "Get system-level status (voltage, current, temperature)");
-        
+        app.add_flag_callback("--get-all-channels", [&options]()
+                              { options.actions.push_back(CommandLineAction::GET_ALL_CHANNELS); },
+                              "Read every channel across all connected modules (load current + status) plus "
+                              "system voltage/current/temperature, in one Modbus session. Pair with --json.");
+        app.add_flag("--json", options.json_output, "Emit machine-readable JSON (for --get-all-channels)");
+
         std::vector<std::string> get_channel_status_args_raw;
         auto get_channel_status_option = app.add_option("--get-channel-status", get_channel_status_args_raw,
                                                         "Get status for specific channel (module_number channel_number)")

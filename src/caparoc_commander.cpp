@@ -426,6 +426,84 @@ int main(int argc, char *argv[])
                 }
                 break;
 
+            case cli::CommandLineAction::GET_ALL_CHANNELS:
+            {
+                // One Modbus session: system-level V/I/temp/global, then every channel of every
+                // connected module (load current + nominal + fault status). --json for the dashboard.
+                auto jesc = [](const std::string &s) { std::string o; for (char c : s) { if (c == '"' || c == '\\') o += '\\'; o += c; } return o; };
+                auto jb = [](bool b) { return b ? "true" : "false"; };
+
+                auto num_modules = caparoc::get_number_of_connected_modules(conn);
+                auto v    = caparoc::get_input_voltage(conn);          // centivolts
+                auto cur  = caparoc::get_total_system_current(conn);   // A
+                auto temp = caparoc::get_internal_temperature(conn);   // °C
+                auto gs   = caparoc::get_global_status(conn);
+
+                if (options.json_output)
+                {
+                    std::string o = "{";
+                    o += std::format("\"ip\":\"{}\",", jesc(options.ip_address));
+                    o += std::format("\"connected_modules\":{},", num_modules ? std::to_string(*num_modules) : "null");
+                    o += std::format("\"input_voltage_v\":{},", v ? std::format("{:.2f}", *v / 100.0) : "null");
+                    o += std::format("\"total_current_a\":{},", cur ? std::to_string(*cur) : "null");
+                    o += std::format("\"temperature_c\":{},", temp ? std::to_string(*temp) : "null");
+                    o += gs ? std::format("\"global\":{{\"undervoltage\":{},\"overvoltage\":{},\"channel_error\":{},\"warning_80\":{},\"system_current_too_high\":{}}},",
+                                          jb(gs->undervoltage), jb(gs->overvoltage), jb(gs->cumulative_channel_error), jb(gs->cumulative_80_warning), jb(gs->system_current_too_high))
+                            : std::string("\"global\":null,");
+                    o += "\"channels\":[";
+                    bool first = true;
+                    if (num_modules)
+                        for (uint8_t m = 1; m <= *num_modules; ++m)
+                        {
+                            auto pname = caparoc::get_product_name_module(conn, m);
+                            auto nch = caparoc::get_number_of_channels_for_module(conn, m);
+                            for (uint16_t ch = 1; nch && ch <= *nch; ++ch)
+                            {
+                                auto lc  = caparoc::get_load_current(conn, m, static_cast<uint8_t>(ch));
+                                auto nom = caparoc::get_nominal_current(conn, m, static_cast<uint8_t>(ch));
+                                auto st  = caparoc::get_channel_status(conn, m, static_cast<uint8_t>(ch));
+                                bool fault = st && (st->overload || st->short_circuit || st->hardware_error || st->voltage_error);
+                                o += first ? "{" : ",{"; first = false;
+                                o += std::format("\"module\":{},\"channel\":{},", static_cast<int>(m), static_cast<int>(ch));
+                                o += std::format("\"product\":\"{}\",", pname ? jesc(*pname) : "");
+                                o += std::format("\"load_current_a\":{},", lc ? std::format("{:.1f}", *lc / 1000.0) : "null");
+                                o += std::format("\"nominal_current_a\":{},", nom ? std::to_string(*nom) : "null");
+                                o += std::format("\"fault\":{},", jb(fault));
+                                o += st ? std::format("\"status\":{{\"warning_80\":{},\"overload\":{},\"short_circuit\":{},\"hardware_error\":{},\"voltage_error\":{}}}",
+                                                      jb(st->warning_80_percent), jb(st->overload), jb(st->short_circuit), jb(st->hardware_error), jb(st->voltage_error))
+                                        : std::string("\"status\":null");
+                                o += "}";
+                            }
+                        }
+                    o += "]}";
+                    portable::println(o);
+                }
+                else
+                {
+                    portable::println("=== All channels @ {} ===", options.ip_address);
+                    portable::println("Input {} V | Total {} A | {} C | modules {}",
+                                      v ? std::format("{:.2f}", *v / 100.0) : "?", cur ? std::to_string(*cur) : "?",
+                                      temp ? std::to_string(*temp) : "?", num_modules ? std::to_string(*num_modules) : "?");
+                    portable::println("{:<7}{:<8}{:<10}{:<10}{}", "module", "channel", "load(A)", "nom(A)", "status");
+                    if (num_modules)
+                        for (uint8_t m = 1; m <= *num_modules; ++m)
+                        {
+                            auto nch = caparoc::get_number_of_channels_for_module(conn, m);
+                            for (uint16_t ch = 1; nch && ch <= *nch; ++ch)
+                            {
+                                auto lc  = caparoc::get_load_current(conn, m, static_cast<uint8_t>(ch));
+                                auto nom = caparoc::get_nominal_current(conn, m, static_cast<uint8_t>(ch));
+                                auto st  = caparoc::get_channel_status(conn, m, static_cast<uint8_t>(ch));
+                                bool fault = st && (st->overload || st->short_circuit || st->hardware_error || st->voltage_error);
+                                portable::println("{:<7}{:<8}{:<10}{:<10}{}", static_cast<int>(m), static_cast<int>(ch),
+                                                  lc ? std::format("{:.1f}", *lc / 1000.0) : "?",
+                                                  nom ? std::to_string(*nom) : "?", fault ? "FAULT" : "ok");
+                            }
+                        }
+                }
+                break;
+            }
+
             case cli::CommandLineAction::CONTROL_CHANNEL:
                 for (const auto &args : options.control_channel_args)
                 {
