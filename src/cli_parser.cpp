@@ -79,8 +79,8 @@ namespace cli
         CLI::App app{"Caparoc Commander"};
         app.set_help_flag("-h,--help", "Show all available options");
 
-        app.add_option("-i,--ip", options.ip_address, "IP address of the CAPAROC device")
-            ->default_val("192.168.1.2");
+        app.add_option("-i,--ip", options.ip_address,
+                       "IP address of the CAPAROC device (no default; look it up in smarcel-core-status)");
         app.add_option("-p,--port", options.port, "Modbus TCP port")
             ->default_val(502);
         app.add_flag_callback("-l,--list", [&options]()
