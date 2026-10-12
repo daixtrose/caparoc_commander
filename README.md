@@ -215,7 +215,7 @@ caparoc_commander --ip 192.168.1.2 --get-network
 
 # Give the module at 192.168.1.2 the address 192.168.1.241, waiting up to 30 s
 # for it to answer there
-caparoc_commander --ip 192.168.1.2 --set-ip 192.168.1.241 255.255.255.0 192.168.1.1 --timeout=30
+caparoc_commander --ip 192.168.1.2 --set-ip 192.168.1.241 255.255.255.0 192.168.1.1 --timeout 30
 ```
 
 ### Miscellaneous

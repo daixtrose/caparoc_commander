@@ -196,7 +196,7 @@ namespace cli
         
         app.add_flag("-d,--debug", options.debug, "Enable debug output")
             ->default_val(false);
-        app.add_flag("-t,--timeout", options.timeout_seconds, "Connection timeout in seconds")
+        app.add_option("-t,--timeout", options.timeout_seconds, "Connection timeout in seconds")
             ->default_val(3);
 
         try
