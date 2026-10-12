@@ -1,6 +1,6 @@
 .\" Manpage for caparoc_commander
 .\" Copyright (c) 2026 Markus Werle — MIT License
-.TH CAPAROC_COMMANDER 1 "March 2026" "caparoc_commander 0.5.0" "User Commands"
+.TH CAPAROC_COMMANDER 1 "October 2026" "caparoc_commander 1.1.0" "User Commands"
 .SH NAME
 caparoc_commander \- command\-line tool for Phoenix Contact CAPAROC systems
 .SH SYNOPSIS
@@ -13,6 +13,8 @@ TCP.
 It exposes every register documented in the CAPAROC Modbus register map and
 provides high\-level convenience commands for device management, monitoring and
 configuration.
+It also reads and sets the module's IP address through the module's web
+interface.
 .PP
 Multiple action flags can be combined in a single invocation; they are executed
 in the order given on the command line.
@@ -20,13 +22,19 @@ in the order given on the command line.
 .SS Connection
 .TP
 \fB\-i\fR, \fB\-\-ip\fR \fIADDRESS\fR
-IP address of the CAPAROC device (default: \fB192.168.1.2\fR).
+IP address of the CAPAROC device (no default).
 .TP
 \fB\-p\fR, \fB\-\-port\fR \fIPORT\fR
 Modbus TCP port (default: \fB502\fR).
 .TP
+\fB\-\-web\-port\fR \fIPORT\fR
+TCP port of the module's web interface, used by \fB\-\-get\-network\fR and
+\fB\-\-set\-ip\fR (default: \fB80\fR).
+.TP
 \fB\-t\fR, \fB\-\-timeout\fR \fISECONDS\fR
 Connection timeout in seconds (default: \fB3\fR).
+For \fB\-\-set\-ip\fR also how long the new address is asked to confirm the
+settings.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
 Enable debug output. Prints connection details and the parsed command\-line
@@ -125,6 +133,28 @@ Reset the error counters for all Circuit Breakers.
 .TP
 \fB\-\-reset\-application\-params\-quint\fR
 Reset application parameters for the QUINT Power Supply.
+.SS Network Settings (Web Interface)
+These options use the module's web interface
+(\fBhttp://\fR\fIADDRESS\fR\fB/webif/network\fR, plain HTTP, no login) instead
+of Modbus.
+A command line with only these options opens no Modbus connection.
+.TP
+\fB\-\-get\-network\fR
+Print the module's mode, address, mask and gateway.
+With \fB\-\-json\fR, print them as the JSON object the module uses.
+.TP
+\fB\-\-set\-ip\fR \fIADDRESS MASK GATEWAY\fR
+Give the module at \fB\-\-ip\fR the static address \fIADDRESS\fR with
+\fIMASK\fR and \fIGATEWAY\fR (\fB0.0.0.0\fR for none).
+Before anything is sent, the tool refuses a mask that is not ones followed by
+zeros; an address that is not unicast, or is the network or broadcast address
+of its subnet; a gateway other than \fB0.0.0.0\fR outside that subnet or equal
+to the address; an address outside the subnet the module is in now; and an
+address at which a web server already answers.
+It prints the settings before, the settings sent and the settings read back,
+asking the new address every half second until they match or
+\fB\-\-timeout\fR has passed.
+If the module already has the settings, nothing is sent.
 .SH EXAMPLES
 List all registers:
 .PP
@@ -174,6 +204,23 @@ caparoc_commander \-\-unlock\-nominal\-current 1 1 \-\-set\-nominal\-current 1 1
 .fi
 .RE
 .PP
+Read the network settings of the module at 192.168.1.2:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-ip 192.168.1.2 \-\-get\-network
+.fi
+.RE
+.PP
+Give it the address 192.168.1.241, waiting up to 30 seconds for it to answer
+there:
+.PP
+.RS 4
+.nf
+caparoc_commander \-\-ip 192.168.1.2 \-\-set\-ip 192.168.1.241 255.255.255.0 192.168.1.1 \-\-timeout 30
+.fi
+.RE
+.PP
 Connect to a device at a non\-default address:
 .PP
 .RS 4
@@ -187,7 +234,8 @@ caparoc_commander \-i 10.0.0.50 \-p 5020 \-\-get\-system\-status
 Successful execution.
 .TP
 .B 1
-An error occurred (connection failure, invalid arguments, device error).
+An error occurred (connection failure, invalid arguments, device error, or
+settings sent with \fB\-\-set\-ip\fR not confirmed in time).
 .SH SEE ALSO
 .PP
 Project repository: \fIhttps://github.com/daixtrose/caparoc_commander\fR

@@ -59,16 +59,27 @@ namespace cli
                 return "GET_CHANNEL_STATUS";
             case CommandLineAction::GET_LOAD_CURRENT:
                 return "GET_LOAD_CURRENT";
+            case CommandLineAction::GET_ALL_CHANNELS:
+                return "GET_ALL_CHANNELS";
             case CommandLineAction::CONTROL_CHANNEL:
                 return "CONTROL_CHANNEL";
             case CommandLineAction::READ_COIL:
                 return "READ_COIL";
             case CommandLineAction::WRITE_COIL:
                 return "WRITE_COIL";
+            case CommandLineAction::GET_NETWORK:
+                return "GET_NETWORK";
+            case CommandLineAction::SET_IP:
+                return "SET_IP";
             }
 
             return "UNKNOWN";
         }
+    }
+
+    bool is_web_interface_action(CommandLineAction action)
+    {
+        return action == CommandLineAction::GET_NETWORK || action == CommandLineAction::SET_IP;
     }
 
     CommandLineOptions parse_command_line(int argc, char *argv[])
@@ -79,8 +90,8 @@ namespace cli
         CLI::App app{"Caparoc Commander"};
         app.set_help_flag("-h,--help", "Show all available options");
 
-        app.add_option("-i,--ip", options.ip_address, "IP address of the CAPAROC device")
-            ->default_val("192.168.1.2");
+        app.add_option("-i,--ip", options.ip_address,
+                       "IP address of the CAPAROC device (no default; look it up in smarcel-core-status)");
         app.add_option("-p,--port", options.port, "Modbus TCP port")
             ->default_val(502);
         app.add_flag_callback("-l,--list", [&options]()
@@ -148,7 +159,26 @@ namespace cli
                               { options.actions.push_back(CommandLineAction::PRINT_DEVICE_INFO); }, "Print device information (modules, product names, channels)");
         app.add_flag_callback("--get-system-status", [&options]()
                               { options.actions.push_back(CommandLineAction::GET_SYSTEM_STATUS); }, "Get system-level status (voltage, current, temperature)");
-        
+        app.add_flag_callback("--get-all-channels", [&options]()
+                              { options.actions.push_back(CommandLineAction::GET_ALL_CHANNELS); },
+                              "Read every channel across all connected modules (load current + status) plus "
+                              "system voltage/current/temperature, in one Modbus session. Pair with --json.");
+        app.add_flag("--json", options.json_output, "Emit machine-readable JSON (for --get-all-channels and --get-network)");
+
+        app.add_flag_callback("--get-network", [&options]()
+                              { options.actions.push_back(CommandLineAction::GET_NETWORK); },
+                              "Read the module's network settings from its web interface (no Modbus). Pair with --json.");
+        std::vector<std::string> set_ip_args_raw;
+        auto set_ip_option = app.add_option("--set-ip", set_ip_args_raw,
+                                            "Give the module at --ip a new static address through its web interface "
+                                            "(address mask gateway; gateway 0.0.0.0 for none), then read it back from the "
+                                            "new address within --timeout")
+                                 ->expected(3)
+                                 ->multi_option_policy(CLI::MultiOptionPolicy::Throw);
+        app.add_option("--web-port", options.web_port, "TCP port of the module's web interface")
+            ->default_val(80)
+            ->check(CLI::Range(1, 65535));
+
         std::vector<std::string> get_channel_status_args_raw;
         auto get_channel_status_option = app.add_option("--get-channel-status", get_channel_status_args_raw,
                                                         "Get status for specific channel (module_number channel_number)")
@@ -166,7 +196,7 @@ namespace cli
         
         app.add_flag("-d,--debug", options.debug, "Enable debug output")
             ->default_val(false);
-        app.add_flag("-t,--timeout", options.timeout_seconds, "Connection timeout in seconds")
+        app.add_option("-t,--timeout", options.timeout_seconds, "Connection timeout in seconds")
             ->default_val(3);
 
         try
@@ -293,6 +323,12 @@ namespace cli
                 options.write_coil_args.push_back({results[i], results[i + 1]});
             }
         }
+        if (set_ip_option->count() > 0)
+        {
+            options.actions.push_back(CommandLineAction::SET_IP);
+            auto results = set_ip_option->results();
+            options.set_ip_args = {results[0], results[1], results[2]};
+        }
         return options;
     }
 
@@ -301,6 +337,7 @@ namespace cli
         std::string output;
         output += std::format("ip_address: {}\n", options.ip_address);
         output += std::format("port: {}\n", options.port);
+        output += std::format("web_port: {}\n", options.web_port);
         output += std::format("timeout_seconds: {}\n", options.timeout_seconds);
         output += "actions:\n";
         if (options.actions.empty())
@@ -385,6 +422,9 @@ namespace cli
                 output += std::format("  - module: {}, channel: {}, value: {}\n", args.module_number, args.channel_number, args.value);
             }
         }
+
+        output += std::format("set_ip_args: address: {}, mask: {}, gateway: {}\n",
+                              options.set_ip_args.address, options.set_ip_args.mask, options.set_ip_args.gateway);
 
         output += "unlock_nominal_current_args:\n";
         if (options.unlock_nominal_current_args.empty())

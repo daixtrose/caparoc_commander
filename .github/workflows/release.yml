@@ -81,6 +81,21 @@ jobs:
       - name: Configure
         run: cmake --preset linux-aarch64-release
 
+      # Professional CMake §22.1: the version is single-sourced in project(VERSION);
+      # the release tag must MATCH it (verify, don't derive).
+      - name: Verify tag matches in-source project version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          PV=$(sed -n 's/.*CPACK_PACKAGE_VERSION *"\([^"]*\)".*/\1/p' \
+                 build/linux-aarch64-release/CPackConfig.cmake | head -1)
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$PV" != "$TAG" ]; then
+            echo "::error::Release tag v$TAG does not match the in-source project() version $PV. Bump project(VERSION), commit, then re-tag (Professional CMake §22.1)."
+            exit 1
+          fi
+          echo "✓ tag matches in-source project version: $PV"
+
       - name: Build
         run: cmake --build --preset linux-aarch64-release --parallel
 

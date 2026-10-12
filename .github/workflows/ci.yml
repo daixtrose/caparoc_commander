@@ -47,6 +47,9 @@ jobs:
       - name: Build
         run: cmake --build --preset linux-x86_64-release --parallel
 
+      - name: Test
+        run: ctest --test-dir build/linux-x86_64-release --output-on-failure
+
       - name: Package
         run: |
           cpack --preset linux-x86_64-release
@@ -93,6 +96,9 @@ jobs:
 
       - name: Build
         run: cmake --build --preset linux-aarch64-release --parallel
+
+      - name: Test (aarch64 binaries via qemu-aarch64-static)
+        run: ctest --test-dir build/linux-aarch64-release --output-on-failure
 
       - name: Package
         run: |
@@ -186,6 +192,9 @@ jobs:
 
       - name: Build
         run: cmake --build --preset windows-x86_64-release --parallel
+
+      - name: Test
+        run: ctest --test-dir build/windows-x86_64-release --output-on-failure
 
       - name: Package
         run: |

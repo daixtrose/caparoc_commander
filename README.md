@@ -1,10 +1,6 @@
 # caparoc_commander
 
-A command-line tool for communicating with
-[Phoenix Contact CAPAROC](https://www.phoenixcontact.com/en-us/products/caparoc)
-circuit-breaker systems over Modbus TCP.
-It exposes every register documented in the CAPAROC Modbus register map and
-adds high-level convenience commands for day-to-day device management.
+A command-line tool for communicating with [Phoenix Contact CAPAROC](https://www.phoenixcontact.com/en-us/products/caparoc) circuit-breaker systems over Modbus TCP. It exposes every register documented in the CAPAROC Modbus register map and adds high-level convenience commands for day-to-day device management. It also reads and sets the module's IP address through the module's web interface.
 
 ## Table of Contents
 
@@ -19,6 +15,7 @@ adds high-level convenience commands for day-to-day device management.
   - [Channel Control](#channel-control)
   - [Nominal Current Management](#nominal-current-management)
   - [Reset Commands](#reset-commands)
+  - [Network Settings (Web Interface)](#network-settings-web-interface)
   - [Miscellaneous](#miscellaneous)
 - [Prerequisites](#prerequisites)
 - [Building with CMake Presets](#building-with-cmake-presets)
@@ -26,22 +23,19 @@ adds high-level convenience commands for day-to-day device management.
   - [Linux Native Build](#linux-native-build)
   - [Linux aarch64 Cross-Compilation](#linux-aarch64-cross-compilation)
   - [Windows Build (MSYS2 MinGW)](#windows-build-msys2-mingw)
+  - [Tests](#tests)
   - [Packaging](#packaging)
 - [Installation from Packages](#installation-from-packages)
 - [License](#license)
 
 ## Features
 
-- **Full register map** – list, search and inspect all 771 CAPAROC Modbus
-  registers from the command line.
-- **Generic read/write** – access any UINT16, UINT32 or STRING32 register by
-  hex address.
+- **Full register map** – list, search and inspect all 771 CAPAROC Modbus registers from the command line.
+- **Generic read/write** – access any UINT16, UINT32 or STRING32 register by hex address.
 - **Coil access** – read and write Modbus coils.
-- **High-level commands** – product names, system status, channel status,
-  load current, channel on/off control, nominal current get/set/unlock, and
-  bulk reset operations.
-- **Cross-platform** – builds on Linux (x86_64 & aarch64) and Windows (MSYS2
-  MinGW-w64).
+- **High-level commands** – product names, system status, channel status, load current, channel on/off control, nominal current get/set/unlock, and bulk reset operations.
+- **Network settings** – read the module's address, mask and gateway, and give it a new static address, through its web interface; the new address is read back to confirm it.
+- **Cross-platform** – builds on Linux (x86_64 & aarch64) and Windows (MSYS2 MinGW-w64).
 
 ## Command-Line Reference
 
@@ -49,16 +43,16 @@ adds high-level convenience commands for day-to-day device management.
 caparoc_commander [OPTIONS]
 ```
 
-Multiple action flags can be combined in a single invocation; they are
-executed in the order given.
+Multiple action flags can be combined in a single invocation; they are executed in the order given.
 
 ### Connection Options
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-i, --ip ADDRESS` | IP address of the CAPAROC device | `192.168.1.2` |
+| `-i, --ip ADDRESS` | IP address of the CAPAROC device | none |
 | `-p, --port PORT` | Modbus TCP port | `502` |
-| `-t, --timeout SECONDS` | Connection timeout in seconds | `3` |
+| `--web-port PORT` | TCP port of the module's web interface (`--get-network`, `--set-ip`) | `80` |
+| `-t, --timeout SECONDS` | Connection timeout in seconds; for `--set-ip` also how long the new address is asked | `3` |
 | `-d, --debug` | Enable debug output | off |
 | `-h, --help` | Show all available options | |
 
@@ -193,6 +187,37 @@ caparoc_commander --unlock-nominal-current 1 1 --set-nominal-current 1 1 4
 | `--error-counter-reset-all-cb` | Reset error counters for all Circuit Breakers |
 | `--reset-application-params-quint` | Reset application parameters for the QUINT Power Supply |
 
+### Network Settings (Web Interface)
+
+These options use the module's web interface (`http://ADDRESS/webif/network`, plain HTTP, no login) instead of Modbus. A command line with only these options opens no Modbus connection.
+
+| Flag | Arguments | Description |
+|------|-----------|-------------|
+| `--get-network` | — | Print the module's mode, address, mask and gateway; with `--json` the JSON object |
+| `--set-ip ADDRESS MASK GATEWAY` | dotted quads; gateway `0.0.0.0` for none | Give the module at `--ip` a new static address, then read the settings back from the new address |
+| `--web-port PORT` | 1–65535 | Port of the web interface (default `80`) |
+
+`--set-ip` refuses, before anything is sent:
+
+- a mask that is not ones followed by zeros; an address that is not unicast, or is the network or broadcast address of its subnet; a gateway other than `0.0.0.0` that lies outside that subnet or is the module's own address;
+- an address outside the subnet the module is in now, since the module could no longer be reached from here;
+- an address at which a web server already answers, since another device has it.
+
+It prints the settings before, the settings sent, and the settings read back. It asks the new address every half second until the settings match or `--timeout` has passed, and exits with status 1 if they do not match in time. If the module already has the settings, nothing is sent.
+
+If two devices share the address given with `--ip`, a request may reach either; connect one at a time.
+
+**Examples:**
+
+```bash
+# Read the network settings
+caparoc_commander --ip 192.168.1.2 --get-network
+
+# Give the module at 192.168.1.2 the address 192.168.1.241, waiting up to 30 s
+# for it to answer there
+caparoc_commander --ip 192.168.1.2 --set-ip 192.168.1.241 255.255.255.0 192.168.1.1 --timeout 30
+```
+
 ### Miscellaneous
 
 | Flag | Description |
@@ -209,12 +234,14 @@ caparoc_commander --unlock-nominal-current 1 1 --set-nominal-current 1 1 4
 | `pkg-config` | For finding libmodbus |
 | autotools (`autoconf`, `automake`, `libtool`) | Required to build the vendored libmodbus |
 
-The following dependencies are **fetched automatically** via CMake
-`FetchContent` – no manual installation necessary:
+The following dependencies are **fetched automatically** via CMake `FetchContent` – no manual installation necessary:
 
-- [libcaparoc](https://github.com/daixtrose/libcaparoc) (v0.4.0) – CAPAROC register map and high-level API
-- [libmodbus-cpp](https://github.com/daixtrose/libmodbus-cpp) (v1.4.0) – C++ Modbus wrapper (itself vendoring [libmodbus](https://github.com/stephane/libmodbus))
+- [libcaparoc](https://github.com/daixtrose/libcaparoc) (v0.6.2) – CAPAROC register map and high-level API
+- [libmodbus-cpp](https://github.com/daixtrose/libmodbus-cpp) (v1.7.2, through libcaparoc) – C++ Modbus wrapper (itself vendoring [libmodbus](https://github.com/stephane/libmodbus))
 - [CLI11](https://github.com/CLIUtils/CLI11) (v2.6.1) – command-line parser
+- [cpp-httplib](https://github.com/yhirose/cpp-httplib) (v0.18.3) – HTTP client for the web interface, built without TLS and compression
+- [nlohmann/json](https://github.com/nlohmann/json) (v3.12.0) – the web interface's JSON
+- [Boost.UT](https://github.com/boost-ext/ut) (v2.1.0) – tests only
 
 ### Debian / Ubuntu
 
@@ -232,8 +259,7 @@ pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
 
 ## Building with CMake Presets
 
-The project ships a `CMakePresets.json` (schema version 8) with ready-made
-configure, build and package presets.
+The project ships a `CMakePresets.json` (schema version 8) with ready-made configure, build and package presets.
 
 ### Available Presets
 
@@ -261,8 +287,7 @@ For a debug build replace `linux-x86_64-release` with `linux-x86_64-debug`.
 
 ### Linux aarch64 Cross-Compilation
 
-Requires the `aarch64-linux-gnu` cross toolchain (e.g.
-`g++-14-aarch64-linux-gnu`):
+Requires the `aarch64-linux-gnu` cross toolchain (e.g. `g++-14-aarch64-linux-gnu`):
 
 ```bash
 cmake --preset linux-aarch64-release
@@ -279,6 +304,16 @@ cmake --build --preset windows-x86_64-release --parallel
 ./build/windows-x86_64-release/bin/caparoc_commander.exe --help
 ```
 
+### Tests
+
+The tests are built with the project unless `-DCAPAROC_COMMANDER_BUILD_TESTS=OFF` is given. They check the address rules and the JSON mapping, and run the network-settings commands against a stand-in for the web interface on `127.0.0.1`:
+
+```bash
+ctest --test-dir build/linux-x86_64-release --output-on-failure
+```
+
+In the aarch64 cross build, `ctest` runs the test binaries through `qemu-aarch64-static`.
+
 ### Packaging
 
 Generate platform packages with the corresponding package preset:
@@ -294,10 +329,7 @@ cpack --preset linux-aarch64-release
 cpack --preset windows-x86_64-release
 ```
 
-Packages are self-contained and install under
-`/opt/daixtrose/caparoc-commander-<version>/`.
-On Debian-based systems the `.deb` package automatically symlinks the
-executable into `/usr/local/bin/`.
+Packages are self-contained and install under `/opt/daixtrose/caparoc-commander-<version>/`. On Debian-based systems the `.deb` package automatically symlinks the executable into `/usr/local/bin/`.
 
 ## Installation from Packages
 

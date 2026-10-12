@@ -32,10 +32,16 @@ enum class CommandLineAction {
     GET_SYSTEM_STATUS,
     GET_CHANNEL_STATUS,
     GET_LOAD_CURRENT,
+    GET_ALL_CHANNELS,
     CONTROL_CHANNEL,
     READ_COIL,
-    WRITE_COIL
+    WRITE_COIL,
+    GET_NETWORK,
+    SET_IP
 };
+
+// Actions on the module's web interface (port --web-port), which need no Modbus connection.
+bool is_web_interface_action(CommandLineAction action);
 
 struct Uint16Args {
     std::string address;
@@ -78,6 +84,12 @@ struct CoilWriteArgs {
     std::string state;  // "on", "off", "true", "false", "1", "0"
 };
 
+struct SetIpArgs {
+    std::string address;
+    std::string mask;
+    std::string gateway;
+};
+
 struct CommandLineOptions {
     std::string ip_address; 
     int port;
@@ -103,8 +115,11 @@ struct CommandLineOptions {
     std::vector<ChannelControlArgs> control_channel_args;
     std::vector<CoilArgs> read_coil_args;
     std::vector<CoilWriteArgs> write_coil_args;
+    int web_port = 80;
+    SetIpArgs set_ip_args;
     bool debug = false;
-}; 
+    bool json_output = false;   // machine-readable output (for --get-all-channels and --get-network)
+};
 
 CommandLineOptions parse_command_line(int argc, char* argv[]);
 std::string dump_command_line_options(const CommandLineOptions& options);

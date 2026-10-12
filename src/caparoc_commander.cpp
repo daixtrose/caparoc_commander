@@ -2,11 +2,79 @@
 #include "libmodbus_cpp/modbus_connection.hpp"
 #include "caparoc_commander/cli_parser.hpp"
 #include "caparoc_commander/create_modbus_connection.hpp"
+#include "caparoc_commander/network_config.hpp"
 #include "caparoc_commander/portable_print.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <format>
+#include <optional>
 #include <stdexcept>
 #include <cstdlib>
+
+namespace
+{
+    // --get-network and --set-ip: the module's web interface at --ip, port --web-port.
+    void run_web_interface_action(cli::CommandLineAction action, const cli::CommandLineOptions &options)
+    {
+        if (options.ip_address.empty())
+        {
+            throw std::invalid_argument("--get-network and --set-ip need --ip ADDRESS, the module's current address");
+        }
+        const webif::Endpoint module{options.ip_address, options.web_port};
+        const std::chrono::milliseconds timeout = std::chrono::seconds{options.timeout_seconds};
+
+        switch (action)
+        {
+        case cli::CommandLineAction::GET_NETWORK:
+        {
+            const auto config = webif::read_network_config(module, timeout);
+            if (options.json_output)
+            {
+                portable::println(webif::to_json(config));
+            }
+            else
+            {
+                portable::println("=== Network settings @ {}:{} ===", module.host, module.port);
+                portable::println("mode:    {}", config.mode);
+                portable::println("address: {}", config.ipv4);
+                portable::println("mask:    {}", config.subnet);
+                portable::println("gateway: {}", config.gateway);
+            }
+            break;
+        }
+
+        case cli::CommandLineAction::SET_IP:
+        {
+            const auto &args = options.set_ip_args;
+            const webif::NetworkConfig wanted{"static", args.address, args.mask, args.gateway};
+            webif::check_static_address(wanted);
+
+            const auto before = webif::read_network_config(module, timeout);
+            portable::println("before: {} (read from {}:{})", webif::describe(before), module.host, module.port);
+            if (before == wanted)
+            {
+                portable::println("The module already has these settings; nothing sent.");
+                break;
+            }
+            webif::check_reachable_after_change(before, wanted);
+            if (wanted.ipv4 != module.host && webif::answers_http({wanted.ipv4, module.port}, timeout))
+            {
+                throw std::invalid_argument(std::format(
+                    "{} already answers on port {}: another device has that address; nothing sent", wanted.ipv4, module.port));
+            }
+
+            portable::println("sent:   {}", webif::describe(wanted));
+            const auto after = webif::apply_network_config(module, wanted, timeout);
+            portable::println("after:  {} (read back from {}:{})", webif::describe(after), wanted.ipv4, module.port);
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -27,18 +95,31 @@ int main(int argc, char *argv[])
             portable::println("");
         }
 
-        // Create and connect to device
-        auto conn = cli::create_modbus_connection(options.ip_address, options.port, options.timeout_seconds);
-
-        if (options.debug)
+        // Connect over Modbus unless every requested action uses the web interface only
+        const bool needs_modbus = options.actions.empty() ||
+                                  !std::ranges::all_of(options.actions, cli::is_web_interface_action);
+        std::optional<libmodbus_cpp::ModbusConnection> modbus;
+        if (needs_modbus)
         {
-            portable::println("Connected successfully!");
-            portable::println("");
+            modbus.emplace(cli::create_modbus_connection(options.ip_address, options.port, options.timeout_seconds));
+
+            if (options.debug)
+            {
+                portable::println("Connected successfully!");
+                portable::println("");
+            }
         }
 
         // Process all requested actions
         for (const auto &action : options.actions)
         {
+            if (cli::is_web_interface_action(action))
+            {
+                run_web_interface_action(action, options);
+                continue;
+            }
+            auto &conn = *modbus;
+
             switch (action)
             {
             case cli::CommandLineAction::LIST_REGISTERS:
@@ -425,6 +506,84 @@ int main(int argc, char *argv[])
                     }
                 }
                 break;
+
+            case cli::CommandLineAction::GET_ALL_CHANNELS:
+            {
+                // One Modbus session: system-level V/I/temp/global, then every channel of every
+                // connected module (load current + nominal + fault status). --json for the dashboard.
+                auto jesc = [](const std::string &s) { std::string o; for (char c : s) { if (c == '"' || c == '\\') o += '\\'; o += c; } return o; };
+                auto jb = [](bool b) { return b ? "true" : "false"; };
+
+                auto num_modules = caparoc::get_number_of_connected_modules(conn);
+                auto v    = caparoc::get_input_voltage(conn);          // centivolts
+                auto cur  = caparoc::get_total_system_current(conn);   // A
+                auto temp = caparoc::get_internal_temperature(conn);   // °C
+                auto gs   = caparoc::get_global_status(conn);
+
+                if (options.json_output)
+                {
+                    std::string o = "{";
+                    o += std::format("\"ip\":\"{}\",", jesc(options.ip_address));
+                    o += std::format("\"connected_modules\":{},", num_modules ? std::to_string(*num_modules) : "null");
+                    o += std::format("\"input_voltage_v\":{},", v ? std::format("{:.2f}", *v / 100.0) : "null");
+                    o += std::format("\"total_current_a\":{},", cur ? std::to_string(*cur) : "null");
+                    o += std::format("\"temperature_c\":{},", temp ? std::to_string(*temp) : "null");
+                    o += gs ? std::format("\"global\":{{\"undervoltage\":{},\"overvoltage\":{},\"channel_error\":{},\"warning_80\":{},\"system_current_too_high\":{}}},",
+                                          jb(gs->undervoltage), jb(gs->overvoltage), jb(gs->cumulative_channel_error), jb(gs->cumulative_80_warning), jb(gs->system_current_too_high))
+                            : std::string("\"global\":null,");
+                    o += "\"channels\":[";
+                    bool first = true;
+                    if (num_modules)
+                        for (uint8_t m = 1; m <= *num_modules; ++m)
+                        {
+                            auto pname = caparoc::get_product_name_module(conn, m);
+                            auto nch = caparoc::get_number_of_channels_for_module(conn, m);
+                            for (uint16_t ch = 1; nch && ch <= *nch; ++ch)
+                            {
+                                auto lc  = caparoc::get_load_current(conn, m, static_cast<uint8_t>(ch));
+                                auto nom = caparoc::get_nominal_current(conn, m, static_cast<uint8_t>(ch));
+                                auto st  = caparoc::get_channel_status(conn, m, static_cast<uint8_t>(ch));
+                                bool fault = st && (st->overload || st->short_circuit || st->hardware_error || st->voltage_error);
+                                o += first ? "{" : ",{"; first = false;
+                                o += std::format("\"module\":{},\"channel\":{},", static_cast<int>(m), static_cast<int>(ch));
+                                o += std::format("\"product\":\"{}\",", pname ? jesc(*pname) : "");
+                                o += std::format("\"load_current_a\":{},", lc ? std::format("{:.1f}", *lc / 1000.0) : "null");
+                                o += std::format("\"nominal_current_a\":{},", nom ? std::to_string(*nom) : "null");
+                                o += std::format("\"fault\":{},", jb(fault));
+                                o += st ? std::format("\"status\":{{\"warning_80\":{},\"overload\":{},\"short_circuit\":{},\"hardware_error\":{},\"voltage_error\":{}}}",
+                                                      jb(st->warning_80_percent), jb(st->overload), jb(st->short_circuit), jb(st->hardware_error), jb(st->voltage_error))
+                                        : std::string("\"status\":null");
+                                o += "}";
+                            }
+                        }
+                    o += "]}";
+                    portable::println(o);
+                }
+                else
+                {
+                    portable::println("=== All channels @ {} ===", options.ip_address);
+                    portable::println("Input {} V | Total {} A | {} C | modules {}",
+                                      v ? std::format("{:.2f}", *v / 100.0) : "?", cur ? std::to_string(*cur) : "?",
+                                      temp ? std::to_string(*temp) : "?", num_modules ? std::to_string(*num_modules) : "?");
+                    portable::println("{:<7}{:<8}{:<10}{:<10}{}", "module", "channel", "load(A)", "nom(A)", "status");
+                    if (num_modules)
+                        for (uint8_t m = 1; m <= *num_modules; ++m)
+                        {
+                            auto nch = caparoc::get_number_of_channels_for_module(conn, m);
+                            for (uint16_t ch = 1; nch && ch <= *nch; ++ch)
+                            {
+                                auto lc  = caparoc::get_load_current(conn, m, static_cast<uint8_t>(ch));
+                                auto nom = caparoc::get_nominal_current(conn, m, static_cast<uint8_t>(ch));
+                                auto st  = caparoc::get_channel_status(conn, m, static_cast<uint8_t>(ch));
+                                bool fault = st && (st->overload || st->short_circuit || st->hardware_error || st->voltage_error);
+                                portable::println("{:<7}{:<8}{:<10}{:<10}{}", static_cast<int>(m), static_cast<int>(ch),
+                                                  lc ? std::format("{:.1f}", *lc / 1000.0) : "?",
+                                                  nom ? std::to_string(*nom) : "?", fault ? "FAULT" : "ok");
+                            }
+                        }
+                }
+                break;
+            }
 
             case cli::CommandLineAction::CONTROL_CHANNEL:
                 for (const auto &args : options.control_channel_args)
