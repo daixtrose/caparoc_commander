@@ -14,6 +14,7 @@ include(GNUInstallDirs)
 include(FetchContent)
 
 option(CAPAROC_COMMANDER_ENABLE_CPACK "Enable CPack packaging support" ${PROJECT_IS_TOP_LEVEL})
+option(CAPAROC_COMMANDER_BUILD_TESTS "Build the caparoc_commander tests" ${PROJECT_IS_TOP_LEVEL})
 
 # ---------------------------------------------------------------------------
 # Dependencies – rebuilt from source
@@ -39,6 +40,58 @@ if(NOT TARGET CLI11::CLI11)
     FetchContent_MakeAvailable(cli11_proj)
 endif()
 
+# cpp-httplib (header only): the client for the module's web interface. Plain HTTP only — the
+# modules serve no TLS — so neither OpenSSL nor compression is linked, and the package gains no
+# run-time dependency.
+if(NOT TARGET httplib::httplib)
+    FetchContent_Declare(
+        httplib_proj
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG        v0.18.3
+        GIT_SHALLOW    TRUE
+        SYSTEM
+    )
+    set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_ZLIB_IF_AVAILABLE    OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_USE_BROTLI_IF_AVAILABLE  OFF CACHE BOOL "" FORCE)
+    set(HTTPLIB_INSTALL                  OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(httplib_proj)
+endif()
+
+# nlohmann/json (header only): the module's network settings are a JSON object.
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    FetchContent_Declare(
+        nlohmann_json_proj
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        v3.12.0
+        GIT_SHALLOW    TRUE
+        SYSTEM
+    )
+    set(JSON_Install OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(nlohmann_json_proj)
+endif()
+
+# ---------------------------------------------------------------------------
+# Web interface of the module (network settings), a library of its own so
+# the tests link it without the Modbus side
+# ---------------------------------------------------------------------------
+add_library(caparoc_commander_webif STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/src/network_config.cpp
+)
+
+target_include_directories(caparoc_commander_webif
+    PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}/include
+)
+
+target_link_libraries(caparoc_commander_webif
+    PRIVATE
+        httplib::httplib
+        nlohmann_json::nlohmann_json
+)
+
+target_compile_features(caparoc_commander_webif PUBLIC cxx_std_23)
+
 # ---------------------------------------------------------------------------
 # Executable
 # ---------------------------------------------------------------------------
@@ -60,22 +113,25 @@ target_include_directories(caparoc_commander
 target_link_libraries(caparoc_commander
     PRIVATE
         caparoc
+        caparoc_commander_webif
         CLI11::CLI11
 )
 
 target_compile_features(caparoc_commander PRIVATE cxx_std_23)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(caparoc_commander PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
-    )
-elseif(MSVC)
-    target_compile_options(caparoc_commander PRIVATE
-        /W4
-    )
-endif()
+foreach(target IN ITEMS caparoc_commander caparoc_commander_webif)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+        )
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE
+            /W4
+        )
+    endif()
+endforeach()
 
 # Statically link MinGW runtime (libstdc++, libgcc, libwinpthread) so the
 # resulting .exe is fully self-contained and runs without MSYS2/MinGW installed.
@@ -85,5 +141,10 @@ endif()
 
 # Trixie ships GCC 14 libstdc++, so no static-libstdc++ kludge needed
 # any more — the deb declares libstdc++6 as a runtime Depends:.
+
+if(CAPAROC_COMMANDER_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/CMakeListsCPackConfiguration.txt)

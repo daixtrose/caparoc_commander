@@ -2,11 +2,79 @@
 #include "libmodbus_cpp/modbus_connection.hpp"
 #include "caparoc_commander/cli_parser.hpp"
 #include "caparoc_commander/create_modbus_connection.hpp"
+#include "caparoc_commander/network_config.hpp"
 #include "caparoc_commander/portable_print.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <format>
+#include <optional>
 #include <stdexcept>
 #include <cstdlib>
+
+namespace
+{
+    // --get-network and --set-ip: the module's web interface at --ip, port --web-port.
+    void run_web_interface_action(cli::CommandLineAction action, const cli::CommandLineOptions &options)
+    {
+        if (options.ip_address.empty())
+        {
+            throw std::invalid_argument("--get-network and --set-ip need --ip ADDRESS, the module's current address");
+        }
+        const webif::Endpoint module{options.ip_address, options.web_port};
+        const std::chrono::milliseconds timeout = std::chrono::seconds{options.timeout_seconds};
+
+        switch (action)
+        {
+        case cli::CommandLineAction::GET_NETWORK:
+        {
+            const auto config = webif::read_network_config(module, timeout);
+            if (options.json_output)
+            {
+                portable::println(webif::to_json(config));
+            }
+            else
+            {
+                portable::println("=== Network settings @ {}:{} ===", module.host, module.port);
+                portable::println("mode:    {}", config.mode);
+                portable::println("address: {}", config.ipv4);
+                portable::println("mask:    {}", config.subnet);
+                portable::println("gateway: {}", config.gateway);
+            }
+            break;
+        }
+
+        case cli::CommandLineAction::SET_IP:
+        {
+            const auto &args = options.set_ip_args;
+            const webif::NetworkConfig wanted{"static", args.address, args.mask, args.gateway};
+            webif::check_static_address(wanted);
+
+            const auto before = webif::read_network_config(module, timeout);
+            portable::println("before: {} (read from {}:{})", webif::describe(before), module.host, module.port);
+            if (before == wanted)
+            {
+                portable::println("The module already has these settings; nothing sent.");
+                break;
+            }
+            webif::check_reachable_after_change(before, wanted);
+            if (wanted.ipv4 != module.host && webif::answers_http({wanted.ipv4, module.port}, timeout))
+            {
+                throw std::invalid_argument(std::format(
+                    "{} already answers on port {}: another device has that address; nothing sent", wanted.ipv4, module.port));
+            }
+
+            portable::println("sent:   {}", webif::describe(wanted));
+            const auto after = webif::apply_network_config(module, wanted, timeout);
+            portable::println("after:  {} (read back from {}:{})", webif::describe(after), wanted.ipv4, module.port);
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -27,18 +95,31 @@ int main(int argc, char *argv[])
             portable::println("");
         }
 
-        // Create and connect to device
-        auto conn = cli::create_modbus_connection(options.ip_address, options.port, options.timeout_seconds);
-
-        if (options.debug)
+        // Connect over Modbus unless every requested action uses the web interface only
+        const bool needs_modbus = options.actions.empty() ||
+                                  !std::ranges::all_of(options.actions, cli::is_web_interface_action);
+        std::optional<libmodbus_cpp::ModbusConnection> modbus;
+        if (needs_modbus)
         {
-            portable::println("Connected successfully!");
-            portable::println("");
+            modbus.emplace(cli::create_modbus_connection(options.ip_address, options.port, options.timeout_seconds));
+
+            if (options.debug)
+            {
+                portable::println("Connected successfully!");
+                portable::println("");
+            }
         }
 
         // Process all requested actions
         for (const auto &action : options.actions)
         {
+            if (cli::is_web_interface_action(action))
+            {
+                run_web_interface_action(action, options);
+                continue;
+            }
+            auto &conn = *modbus;
+
             switch (action)
             {
             case cli::CommandLineAction::LIST_REGISTERS:
